@@ -10,10 +10,12 @@
         "public/**/*"
     ],
     "mac": {
+        "target": "dmg",
         "icon": "public/icon.png",
         "category": "public.app-category.business"
     },
     "win": {
+        "target": "nsis",
         "icon": "public/icon.png"
     },
     "linux": {
