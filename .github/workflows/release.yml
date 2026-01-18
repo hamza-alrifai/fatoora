@@ -32,16 +32,8 @@ jobs:
       - name: Build React and Electron Source
         run: npm run build
 
-      - name: Compile & Release Electron App
-        uses: samuelmeuli/action-electron-builder@v1
-        with:
-          # GitHub token, automatically provided to the action
-          # (No need to define this secret in the repo settings)
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-
-          # If the commit is tagged with a version (e.g. "v1.0.0"),
-          # release the app after building
-          release: true
-          
-          # Args for electron-builder
-          args: "--config electron-builder.json --mac dmg --win nsis"
+      - name: Compile and Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          npx electron-builder --config electron-builder.json --publish always --mac dmg --win nsis

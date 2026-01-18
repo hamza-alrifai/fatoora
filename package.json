@@ -1,7 +1,13 @@
 {
   "name": "fatoora",
+  "version": "1.0.4",
+  "description": "Electron-based Invoice Matching App",
+  "author": "Hamza Alrifai",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hamza-alrifai/fatoora.git"
+  },
   "private": true,
-  "version": "0.0.0",
   "main": "dist-electron/main.js",
   "scripts": {
     "dev": "concurrently \"npm run dev:react\" \"npm run dev:electron\"",
