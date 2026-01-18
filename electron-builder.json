@@ -1,0 +1,23 @@
+{
+    "appId": "com.fatoora.app",
+    "productName": "Fatoora",
+    "directories": {
+        "output": "release"
+    },
+    "files": [
+        "dist/**/*",
+        "dist-electron/**/*",
+        "public/**/*"
+    ],
+    "mac": {
+        "icon": "public/icon.png",
+        "category": "public.app-category.business"
+    },
+    "win": {
+        "icon": "public/icon.png"
+    },
+    "linux": {
+        "icon": "public/icon.png",
+        "category": "Office"
+    }
+}
