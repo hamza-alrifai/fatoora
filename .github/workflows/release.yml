@@ -14,7 +14,11 @@ jobs:
 
     strategy:
       matrix:
-        os: [macos-latest, windows-latest]
+        include:
+          - os: macos-latest
+            args: "--config electron-builder.json --mac dmg --publish always"
+          - os: windows-latest
+            args: "--config electron-builder.json --win nsis --publish always"
 
     steps:
       - name: Check out Git repository
@@ -36,4 +40,4 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          npx electron-builder --config electron-builder.json --publish always --mac dmg --win nsis
+          npx electron-builder ${{ matrix.args }}
