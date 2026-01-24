@@ -1,12 +1,705 @@
+// ... (previous imports)
 import { app, BrowserWindow, ipcMain, dialog, shell, nativeImage } from 'electron';
 import path from 'path';
 import * as XLSX from 'xlsx';
 import fs from 'fs';
+import { v4 as uuidv4 } from 'uuid';
+
+// ... (existing helper functions and handlers)
+
+// --- INVOICING MODULE ---
+
+const INVOICING_MODULE_STARTED = true;
+
+// --- INVOICING MODULE (LowDB) ---
+
+interface DBData {
+    customers: any[];
+    invoices: any[];
+    products: any[];
+}
+
+let dbInstance: any = null;
+
+async function getDB() {
+    // Dynamic import for ESM-only package
+    // @ts-ignore
+    const { JSONFilePreset } = (await import('lowdb/node')) as any;
+    const dbPath = path.join(app.getPath('userData'), 'db.json');
+
+    // Always re-initialize to ensure fresh read from disk, or call read()
+    // Using JSONFilePreset will read from disk.
+    // If we cache dbInstance, we must call dbInstance.read() to get updates from other processes?
+    // Electron main process is single threaded, so memory should be consistent.
+    // However, let's be safe.
+
+    if (!dbInstance) {
+        dbInstance = await JSONFilePreset(dbPath, { customers: [], invoices: [], products: [], bankingDetails: null });
+
+        // ONE-TIME CLEANUP (Deleting old JSON files and folders)
+        try {
+            const oldCustomersDir = path.join(app.getPath('userData'), 'customers');
+            const oldInvoicesDir = path.join(app.getPath('userData'), 'invoices');
+
+            if (fs.existsSync(oldCustomersDir)) {
+                fs.rmSync(oldCustomersDir, { recursive: true, force: true });
+            }
+            if (fs.existsSync(oldInvoicesDir)) {
+                fs.rmSync(oldInvoicesDir, { recursive: true, force: true });
+            }
+        } catch (e) {
+            console.error("Cleanup error:", e);
+        }
+    } else {
+        await dbInstance.read();
+    }
+
+    return dbInstance;
+}
+
+// Handlers
+
+// Save Customer
+ipcMain.handle('customer:save', async (_, customer: any) => {
+    try {
+        const db = await getDB();
+        if (!customer.id) {
+            customer.id = uuidv4();
+            customer.createdAt = new Date().toISOString();
+        }
+        customer.updatedAt = new Date().toISOString();
+        // Ensure ratio fields exist
+        customer.total20mm = customer.total20mm || 0;
+        customer.total10mm = customer.total10mm || 0;
+
+        const idx = db.data.customers.findIndex((c: any) => c.id === customer.id);
+        if (idx >= 0) {
+            db.data.customers[idx] = customer;
+        } else {
+            db.data.customers.push(customer);
+        }
+        await db.write(); // Persist
+        return { success: true, id: customer.id };
+    } catch (e: any) {
+        return { success: false, error: e.message };
+    }
+});
+
+// Get All Customers
+ipcMain.handle('customer:list', async () => {
+    try {
+        const db = await getDB();
+        return { success: true, customers: db.data.customers };
+    } catch (e: any) {
+        return { success: false, error: e.message };
+    }
+});
+
+// Delete Customer
+ipcMain.handle('customer:delete', async (_, id: string) => {
+    try {
+        const db = await getDB();
+        const initialLen = db.data.customers.length;
+        db.data.customers = db.data.customers.filter((c: any) => c.id !== id);
+        if (db.data.customers.length !== initialLen) {
+            await db.write();
+            return { success: true };
+        }
+        return { success: false, error: 'Customer not found' };
+    } catch (e: any) {
+        return { success: false, error: e.message };
+    }
+});
+
+// Save Invoice
+ipcMain.handle('invoice:save', async (_, invoice: any) => {
+    try {
+        const db = await getDB();
+        if (!invoice.id) {
+            invoice.id = uuidv4();
+            invoice.createdAt = new Date().toISOString();
+        }
+        invoice.updatedAt = new Date().toISOString();
+
+        const idx = db.data.invoices.findIndex((inv: any) => inv.id === invoice.id);
+        if (idx >= 0) {
+            db.data.invoices[idx] = invoice;
+        } else {
+            db.data.invoices.push(invoice);
+        }
+        await db.write();
+        return { success: true, id: invoice.id };
+    } catch (e: any) {
+        return { success: false, error: e.message };
+    }
+});
+
+// Get All Invoices
+ipcMain.handle('invoice:list', async () => {
+    try {
+        const db = await getDB();
+
+        // Auto-Check Overdue Status
+        const now = new Date();
+        now.setHours(0, 0, 0, 0); // Midnight today
+        let hasUpdates = false;
+
+        db.data.invoices.forEach((inv: any) => {
+            if (inv.status === 'issued' && inv.dueDate) {
+                const dueDate = new Date(inv.dueDate);
+                // Ensure we compare apples to apples (dates at midnight)
+                dueDate.setHours(0, 0, 0, 0);
+
+                // Debug Log
+                console.log(`[Check Overdue] Inv: ${inv.number}, Status: ${inv.status}, Due: ${inv.dueDate} (Parsed: ${dueDate.toISOString()}), Now: ${now.toISOString()}`);
+
+                // Overdue if today is strictly after the due date
+                if (now.getTime() > dueDate.getTime()) {
+                    console.log(`[Auto-Overdue] !!! Marking invoice ${inv.number} as OVERDUE !!!`);
+                    inv.status = 'overdue';
+                    inv.updatedAt = new Date().toISOString();
+                    hasUpdates = true;
+                }
+            }
+        });
+
+        if (hasUpdates) {
+            await db.write();
+        }
+
+        // Sort DESC
+        const sorted = [...db.data.invoices].sort((a: any, b: any) =>
+            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        );
+        return { success: true, invoices: sorted };
+    } catch (e: any) {
+        return { success: false, error: e.message };
+    }
+});
+
+// Delete Invoice
+ipcMain.handle('invoice:delete', async (_, id: string) => {
+    try {
+        const db = await getDB();
+        const initialLen = db.data.invoices.length;
+        db.data.invoices = db.data.invoices.filter((inv: any) => inv.id !== id);
+        if (db.data.invoices.length !== initialLen) {
+            await db.write();
+            return { success: true };
+        }
+        return { success: false, error: 'Invoice not found' };
+    } catch (e: any) {
+        return { success: false, error: e.message };
+    }
+});
+
+// Save Product
+ipcMain.handle('product:save', async (_, product: any) => {
+    try {
+        const db = await getDB();
+        if (!product.id) {
+            product.id = uuidv4();
+            product.createdAt = new Date().toISOString();
+        }
+        product.updatedAt = new Date().toISOString();
+
+        const idx = db.data.products.findIndex((p: any) => p.id === product.id);
+        if (idx >= 0) {
+            db.data.products[idx] = product;
+        } else {
+            db.data.products.push(product);
+        }
+        await db.write();
+        return { success: true, id: product.id };
+    } catch (e: any) {
+        return { success: false, error: e.message };
+    }
+});
+
+// Get All Products
+ipcMain.handle('product:list', async () => {
+    try {
+        const db = await getDB();
+        return { success: true, products: db.data.products || [] };
+    } catch (e: any) {
+        return { success: false, error: e.message };
+    }
+});
+
+// Delete Product
+ipcMain.handle('product:delete', async (_, id: string) => {
+    try {
+        const db = await getDB();
+        const initialLen = db.data.products.length;
+        db.data.products = db.data.products.filter((p: any) => p.id !== id);
+        if (db.data.products.length !== initialLen) {
+            await db.write();
+            return { success: true };
+        }
+        return { success: false, error: 'Product not found' };
+    } catch (e: any) {
+        return { success: false, error: e.message };
+    }
+});
+
+// Save Banking Details
+ipcMain.handle('settings:saveBanking', async (_, details: any) => {
+    try {
+        const db = await getDB();
+        db.data.bankingDetails = details;
+        await db.write();
+        return { success: true };
+    } catch (e: any) {
+        return { success: false, error: e.message };
+    }
+});
+
+// Get Banking Details
+ipcMain.handle('settings:getBanking', async () => {
+    try {
+        const db = await getDB();
+        return { success: true, data: db.data.bankingDetails || null };
+    } catch (e: any) {
+        return { success: false, error: e.message };
+    }
+});
+
+// Backup Data (Export)
+ipcMain.handle('app:backup', async () => {
+    try {
+        const db = await getDB();
+        const data = JSON.stringify(db.data, null, 2);
+
+        const { filePath } = await dialog.showSaveDialog({
+            title: 'Export Backup',
+            defaultPath: `fatoora-backup-${new Date().toISOString().split('T')[0]}.json`,
+            filters: [{ name: 'JSON', extensions: ['json'] }]
+        });
+
+        if (filePath) {
+            fs.writeFileSync(filePath, data);
+            return { success: true };
+        }
+        return { success: false, error: 'Cancelled' };
+    } catch (e: any) {
+        return { success: false, error: e.message };
+    }
+});
+
+// Restore Data (Import)
+ipcMain.handle('app:restore', async () => {
+    try {
+        const result = await dialog.showOpenDialog({
+            properties: ['openFile'],
+            filters: [{ name: 'JSON', extensions: ['json'] }]
+        });
+
+        if (result.canceled || result.filePaths.length === 0) {
+            return { success: false, error: 'Cancelled' };
+        }
+
+        const filePath = result.filePaths[0];
+        const fileContent = fs.readFileSync(filePath, 'utf-8');
+        const data = JSON.parse(fileContent);
+
+        // Basic validation
+        if (!Array.isArray(data.customers) || !Array.isArray(data.invoices)) {
+            return { success: false, error: 'Invalid backup file format' };
+        }
+
+        const db = await getDB();
+        db.data = data;
+        await db.write();
+
+        return { success: true };
+    } catch (e: any) {
+        return { success: false, error: e.message };
+    }
+});
+
+// Clear Data (Updated to include products if needed, but keeping safe for now)
+ipcMain.handle('app:clearData', async () => {
+    try {
+        const db = await getDB();
+        db.data.customers = [];
+        db.data.invoices = [];
+        // Optional: clear products too? User said "Clear All Data". 
+        // Usually product catalog is persistent configuration. Let's keep products for now unless requested.
+        await db.write();
+        return { success: true };
+    } catch (e: any) {
+        return { success: false, error: e.message };
+    }
+});
+
+// Clear Invoices Only (keeps customers, resets their totals)
+ipcMain.handle('app:clearInvoices', async () => {
+    try {
+        const db = await getDB();
+        // Clear all invoices
+        db.data.invoices = [];
+        // Reset customer totals
+        db.data.customers = db.data.customers.map((c: any) => ({
+            ...c,
+            total10mm: 0,
+            total20mm: 0
+        }));
+        await db.write();
+        return { success: true };
+    } catch (e: any) {
+        return { success: false, error: e.message };
+    }
+});
+
+// Generate PDF
+ipcMain.handle('invoice:pdf', async (_, invoice: any) => {
+    try {
+        // We will generate the PDF using `pdfmake`
+        // Use require for CommonJS
+        const PdfPrinter = require('pdfmake');
+
+        // Fonts need to be defined. For server-side node, we need standard fonts.
+        // We can use the 'Roboto' font included in `pdfmake/fonts/Roboto` usually,
+        // or just map to standard fonts. 
+        // NOTE: pdfmake on node requires fonts to be passed in constructor.
+
+        const fonts = {
+            Roboto: {
+                normal: path.join(__dirname, '../node_modules/pdfmake/fonts/Roboto-Regular.ttf'),
+                bold: path.join(__dirname, '../node_modules/pdfmake/fonts/Roboto-Medium.ttf'),
+                italics: path.join(__dirname, '../node_modules/pdfmake/fonts/Roboto-Italic.ttf'),
+                bolditalics: path.join(__dirname, '../node_modules/pdfmake/fonts/Roboto-MediumItalic.ttf')
+            }
+        };
+
+        const printer = new PdfPrinter(fonts);
+
+        // Fetch banking details from DB
+        const db = await getDB();
+        const banking = db.data.bankingDetails;
+
+        const docDefinition = {
+            content: [
+                // Header: Title + Invoice Info
+                {
+                    columns: [
+                        {
+                            width: '*',
+                            stack: [
+                                { text: 'INVOICE', style: 'header' },
+                                { text: `Invoice #: ${invoice.number || invoice.invoiceNumber}`, style: 'label' },
+                                { text: `Date: ${new Date(invoice.createdAt).toLocaleDateString()}`, style: 'label' },
+                                invoice.dueDate ? { text: `Due Date: ${new Date(invoice.dueDate).toLocaleDateString()}`, style: 'label' } : '',
+                                { text: `Status: ${invoice.status.toUpperCase()}`, style: 'label', color: invoice.status === 'paid' ? 'green' : 'gray' }
+                            ]
+                        },
+                        {
+                            width: 'auto',
+                            stack: [
+                                { text: invoice.to.name, style: 'valueBold' },
+                                { text: invoice.to.address || '', style: 'small' },
+                                invoice.to.phone ? { text: invoice.to.phone, style: 'small' } : '',
+                                invoice.to.email ? { text: invoice.to.email, style: 'small' } : ''
+                            ],
+                            alignment: 'right'
+                        }
+                    ]
+                },
+                { text: '\n' },
+
+                // Payment Terms & Banking Details (Top Section)
+                {
+                    columns: [
+                        {
+                            width: '*',
+                            stack: [
+                                { text: 'PAYMENT TERMS', style: 'labelBold' },
+                                { text: invoice.paymentTerms || 'Net 30', style: 'value' }
+                            ]
+                        },
+                        banking ? {
+                            width: 'auto',
+                            stack: [
+                                { text: 'BENEFICIARY DETAILS', style: 'labelBold' },
+                                { text: banking.beneficiaryName, style: 'valueBold' },
+                                { text: banking.beneficiaryBank, style: 'small' },
+                                { text: `Branch: ${banking.branch}`, style: 'small' },
+                                { text: `IBAN: ${banking.ibanNo}`, style: 'smallMono' },
+                                { text: `SWIFT: ${banking.swiftCode}`, style: 'smallMono' }
+                            ],
+                            alignment: 'right'
+                        } : {}
+                    ]
+                },
+                { text: '\n\n' },
+
+                // Reference Details Grid
+                {
+                    table: {
+                        widths: ['*', '*', '*', '*'],
+                        body: [
+                            [
+                                { text: 'LPO NO', style: 'tableHeaderSmall' },
+                                { text: 'LPO DATE', style: 'tableHeaderSmall' },
+                                { text: 'OFFER REF', style: 'tableHeaderSmall' },
+                                { text: 'OFFER DATE', style: 'tableHeaderSmall' }
+                            ],
+                            [
+                                { text: invoice.lpoNo || '-', style: 'tableCell' },
+                                { text: invoice.lpoDate || '-', style: 'tableCell' },
+                                { text: invoice.commercialOfferRef || '-', style: 'tableCell' },
+                                { text: invoice.commercialOfferDate || '-', style: 'tableCell' }
+                            ]
+                        ]
+                    },
+                    layout: 'lightHorizontalLines'
+                },
+                { text: '\n' },
+
+                // Items Table
+                {
+                    table: {
+                        headerRows: 1,
+                        widths: ['*', 'auto', 'auto', 'auto', 'auto'],
+                        body: [
+                            [
+                                { text: 'DESCRIPTION', style: 'tableHeader' },
+                                { text: 'QTY (TONS)', style: 'tableHeader', alignment: 'right' },
+                                { text: 'MIX %', style: 'tableHeader', alignment: 'right' },
+                                { text: 'RATE', style: 'tableHeader', alignment: 'right' },
+                                { text: 'AMOUNT', style: 'tableHeader', alignment: 'right' }
+                            ],
+                            ...(() => {
+                                const totalQty = invoice.items.reduce((acc: number, item: any) => acc + item.quantity, 0);
+                                const consolidated: Record<string, any> = {};
+                                invoice.items.forEach((item: any) => {
+                                    const key = `${item.description}|${item.unitPrice}`;
+                                    if (consolidated[key]) {
+                                        consolidated[key].quantity += item.quantity;
+                                    } else {
+                                        consolidated[key] = { ...item };
+                                    }
+                                });
+
+                                return Object.values(consolidated).map((item: any) => [
+                                    { text: item.description, style: 'tableCell' },
+                                    { text: item.quantity.toLocaleString(undefined, { maximumFractionDigits: 2 }), style: 'tableCell', alignment: 'right' },
+                                    { text: totalQty > 0 ? ((item.quantity / totalQty) * 100).toFixed(1) + '%' : '-', style: 'tableCell', alignment: 'right' },
+                                    { text: item.unitPrice.toFixed(2), style: 'tableCell', alignment: 'right' },
+                                    { text: (item.quantity * item.unitPrice).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }), style: 'tableCell', alignment: 'right' }
+                                ]);
+                            })()
+                        ]
+                    },
+                },
+
+                // Total Section (Outside Table)
+                { text: '\n' },
+                {
+                    columns: [
+                        { width: '*', text: '' },
+                        {
+                            width: 'auto',
+                            table: {
+                                widths: ['auto', 'auto'],
+                                body: [
+                                    [
+                                        { text: 'TOTAL DUE', style: 'totalLabel', alignment: 'right', margin: [0, 5] },
+                                        {
+                                            text: invoice.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ' + invoice.currency, style: 'totalValue', alignment: 'right', margin: [0, 5]
+                                        }
+                                    ]
+                                ]
+                            },
+                            layout: 'noBorders'
+                        }
+                    ]
+                }
+            ],
+            styles: {
+                header: { fontSize: 26, bold: true, margin: [0, 0, 0, 5] },
+                label: { fontSize: 11, color: '#666666', margin: [0, 2] },
+                labelBold: { fontSize: 10, bold: true, color: '#999999', margin: [0, 2] },
+                value: { fontSize: 12, color: '#333333', margin: [0, 2] },
+                valueBold: { fontSize: 12, bold: true, color: '#333333', margin: [0, 2] },
+                small: { fontSize: 10, color: '#666666', margin: [0, 1] },
+                smallMono: { fontSize: 10, font: 'Roboto', color: '#666666', margin: [0, 1] }, // using default font as mono proxy
+                tableHeader: { fontSize: 11, bold: true, color: '#333333', margin: [0, 5] },
+                tableHeaderSmall: { fontSize: 9, bold: true, color: '#999999' },
+                tableCell: { fontSize: 11, color: '#333333', margin: [0, 5] },
+                totalLabel: { fontSize: 13, bold: true, margin: [0, 10] },
+                totalValue: { fontSize: 16, bold: true, margin: [0, 10] }
+            },
+            defaultStyle: {
+                font: 'Roboto'
+            }
+        };
+
+        // Create PDF Stream
+        const pdfDoc = printer.createPdfKitDocument(docDefinition);
+        const chunks: any[] = [];
+
+        const promise = new Promise<{ success: boolean; error?: string }>((resolve) => {
+            pdfDoc.on('data', (chunk: any) => chunks.push(chunk));
+            pdfDoc.on('end', async () => {
+                try {
+                    const result = Buffer.concat(chunks);
+                    // Save to user documents or temp
+                    const { filePath } = await dialog.showSaveDialog({
+                        title: 'Save Invoice PDF',
+                        defaultPath: `Invoice-${invoice.invoiceNumber}.pdf`,
+                        filters: [{ name: 'PDF', extensions: ['pdf'] }]
+                    });
+
+                    if (filePath) {
+                        fs.writeFileSync(filePath, result);
+                        shell.openPath(filePath); // Open it immediately
+                        resolve({ success: true });
+                    } else {
+                        resolve({ success: false, error: 'Cancelled' });
+                    }
+                } catch (e: any) {
+                    resolve({ success: false, error: e.message });
+                }
+            });
+            pdfDoc.on('error', (e: any) => {
+                resolve({ success: false, error: e.message });
+            });
+        });
+
+        pdfDoc.end();
+        return await promise;
+
+    } catch (e: any) {
+        console.error("PDF Generation Error:", e);
+        return { success: false, error: e.message };
+    }
+});
+
+
+
+// Secure PDF Generation (HTML-to-PDF + Encryption)
+ipcMain.handle('invoice:generate-secure', async (_, invoice: any, appUrl?: string) => {
+    let printWindow: BrowserWindow | null = null;
+    try {
+        console.log('Starting secure PDF generation...');
+        // 1. Create a hidden window
+        printWindow = new BrowserWindow({
+            show: false,
+            width: 794, // A4 width at 96dpi
+            height: 1123,
+            webPreferences: {
+                preload: path.join(__dirname, 'preload.js'),
+                contextIsolation: true,
+                nodeIntegration: false,
+                webSecurity: true
+            }
+        });
+
+        // Debugging: Log renderer console messages to main terminal
+        printWindow.webContents.on('console-message', (event, level, message, line, sourceId) => {
+            console.log(`[Renderer] ${message} (${sourceId}:${line})`);
+        });
+
+        // 2. Load the print route
+        // PRIORITY: Use appUrl passed from Renderer (ensures matching dev/prod environment)
+        let loadUrl = '';
+        if (appUrl) {
+            // If appUrl contains query params, append &mode=print, else ?mode=print
+            // appUrl is usually "http://localhost:5173/" or "file:///.../index.html"
+            const urlObj = new URL(appUrl);
+            urlObj.searchParams.set('mode', 'print');
+            loadUrl = urlObj.toString();
+        } else {
+            // Fallback
+            loadUrl = process.env.VITE_DEV_SERVER_URL
+                ? `${process.env.VITE_DEV_SERVER_URL}?mode=print`
+                : `file://${path.join(__dirname, '../dist/index.html')}?mode=print`;
+        }
+
+        // 3. Handshake: Register LISTENER before loading URL to avoid race condition
+        console.log('Waiting for print-window-ready handshake...');
+
+        const handshakePromise = new Promise<void>((resolve, reject) => {
+            const handshakeTimeout = setTimeout(() => {
+                reject(new Error('Handshake timed out - Renderer did not report ready.'));
+            }, 10000);
+
+            ipcMain.once('print-window-ready', () => {
+                clearTimeout(handshakeTimeout);
+                console.log('Handshake received! Sending invoice data...');
+                if (printWindow && !printWindow.isDestroyed()) {
+                    printWindow.webContents.send('print-data', invoice);
+                    resolve();
+                } else {
+                    reject(new Error('Window destroyed before handshake'));
+                }
+            });
+        });
+
+        // Load URL *AFTER* setting up the listener
+        console.log('Loading URL:', loadUrl);
+        await printWindow.loadURL(loadUrl);
+
+        // Wait for the handshake to complete
+        await handshakePromise;
+
+        // 4. Wait for 'print-ready' signal from Renderer
+        const pdfBuffer = await new Promise<Buffer>((resolve, reject) => {
+            const timeout = setTimeout(() => reject(new Error('Print timed out (15s)')), 15000);
+
+            ipcMain.once('print-ready', async () => {
+                clearTimeout(timeout);
+                console.log('Received print-ready, printing to PDF...');
+                try {
+                    if (!printWindow) throw new Error('Window lost');
+                    const data = await printWindow.webContents.printToPDF({
+                        printBackground: true,
+                        pageSize: 'A4',
+                        margins: { top: 0, bottom: 0, left: 0, right: 0 } // CSS handles margins
+                    });
+                    resolve(data);
+                } catch (e) {
+                    reject(e);
+                }
+            });
+        });
+
+        console.log('PDF rendered, saving...');
+
+        // Save the PDF directly (pdf-lib encryption API not available)
+        const pdfBytes = pdfBuffer;
+
+        // 6. Save Dialog
+        const { filePath } = await dialog.showSaveDialog({
+            title: 'Save Secure Invoice',
+            defaultPath: `Invoice-${invoice.invoiceNumber}.pdf`,
+            filters: [{ name: 'PDF', extensions: ['pdf'] }]
+        });
+
+        if (filePath) {
+            fs.writeFileSync(filePath, pdfBytes);
+            console.log('Saved to:', filePath);
+            shell.openPath(filePath);
+            printWindow.close();
+            return { success: true };
+        } else {
+            printWindow.close();
+            return { success: false, error: 'Cancelled' };
+        }
+
+    } catch (e: any) {
+        console.error("Secure PDF Error:", e);
+        if (printWindow) printWindow.close();
+        return { success: false, error: e.message };
+    }
+});
 
 let mainWindow: BrowserWindow | null = null;
 
 function createWindow() {
     // Set dock icon on macOS
+
     if (process.platform === 'darwin') {
         const iconPath = process.env.VITE_DEV_SERVER_URL
             ? path.join(__dirname, '../public/icon.png')
@@ -35,10 +728,27 @@ function createWindow() {
     if (process.env.VITE_DEV_SERVER_URL) {
         mainWindow.loadURL(process.env.VITE_DEV_SERVER_URL);
     } else {
-        mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
+        // In dev mode, if env var is missing, try localhost with retry
+        if (!app.isPackaged) {
+            const loadDevServer = async (retries = 0) => {
+                try {
+                    await mainWindow?.loadURL('http://localhost:5173');
+                } catch (e) {
+                    if (retries < 20) { // Try for 10 seconds (20 * 500ms)
+                        setTimeout(() => loadDevServer(retries + 1), 500);
+                    } else {
+                        mainWindow?.loadFile(path.join(__dirname, '../dist/index.html'));
+                    }
+                }
+            };
+            loadDevServer();
+        } else {
+            mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
+        }
     }
 
     mainWindow.once('ready-to-show', () => {
+        mainWindow?.maximize();
         mainWindow?.show();
     });
 }
@@ -389,6 +1099,17 @@ ipcMain.handle('excel:process', async (_, options: ProcessOptions) => {
         const validationWarnings: Array<{ type: string; file: string; row: number; message: string }> = [];
         const masterDuplicates = new Map<string, number[]>(); // key -> row numbers
 
+        // Process Files
+        interface MatchedRow {
+            sourceFile: string;
+            data: any[];
+            rowNumber: number;
+        }
+
+        const matchedRows: MatchedRow[] = [];
+
+        // ... (existing helper functions if any, but this is inside the handler)
+
         // STEP 1: Build Master Lookup (what exists in master file)
         // Read with cellNF:true and cellStyles:true to preserve formats (dates, colors)
         const masterWb = XLSX.readFile(masterPath, { cellDates: false, cellNF: true, cellStyles: true });
@@ -554,6 +1275,14 @@ ipcMain.handle('excel:process', async (_, options: ProcessOptions) => {
                             }
                             targetLookup.get(key)!.add(matchString);
                             stats.matched++;
+
+                            // RECORD MATCHED ROW FOR INVOICING
+                            matchedRows.push({
+                                sourceFile: targetPath,
+                                data: row,
+                                rowNumber: rowIndex + 1
+                            });
+
                         } else {
                             // This row is NOT in master, add to unmatched
                             unmatchedRows.push([...row, path.basename(targetPath)]);
@@ -676,7 +1405,8 @@ ipcMain.handle('excel:process', async (_, options: ProcessOptions) => {
             },
             perFileStats,
             unmatchedPath,
-            warnings: validationWarnings.length > 0 ? validationWarnings : undefined
+            warnings: validationWarnings.length > 0 ? validationWarnings : undefined,
+            matchedRows // Return the matched data
         };
 
     } catch (error: any) {

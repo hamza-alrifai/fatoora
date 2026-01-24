@@ -23,7 +23,89 @@ export interface FileAnalysis {
     error?: string;
 }
 
+// Invoicing Types
+export interface Customer {
+    id: string;
+    name: string;
+    address: string;
+    email?: string;
+    phone?: string;
+    // For 60/40 ratio calculation
+    total20mm: number;
+    total10mm: number;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface InvoiceItem {
+    id: string;
+    description: string;
+    quantity: number;
+    unitPrice: number;
+    amount: number;
+    type?: '20mm' | '10mm' | 'other'; // Added for ratio calculation
+}
+
+export interface BusinessDetails {
+    name: string;
+    address: string;
+    email: string;
+    phone: string;
+    logo?: string;
+}
+
+export interface ClientDetails {
+    customerId?: string; // Link to verified customer
+    name: string;
+    address: string;
+    email: string;
+    phone?: string;
+}
+
+export interface Invoice {
+    id: string;
+    number: string;
+    date: string;
+    lpoNo?: string;
+    lpoDate?: string;
+    dueDate?: string;
+    commercialOfferRef?: string;
+    commercialOfferDate?: string;
+    paymentTerms?: string;
+    status: 'draft' | 'issued' | 'paid' | 'overdue';
+    from: BusinessDetails;
+    to: ClientDetails;
+    items: InvoiceItem[];
+    subtotal: number;
+    tax: number;
+    total: number;
+    currency: string;
+    notes?: string;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface BankingDetails {
+    beneficiaryName: string;
+    beneficiaryBank: string;
+    branch: string;
+    ibanNo: string;
+    swiftCode: string;
+}
+
+// Products
+export interface Product {
+    id: string;
+    name: string;
+    description?: string;
+    rate: number;
+    type: '10mm' | '20mm' | 'other';
+    createdAt: string;
+    updatedAt: string;
+}
+
 export interface ElectronAPI {
+    // Legacy Excel & File System
     readExcelHeaders: (filePath: string) => Promise<{ success: boolean; headers?: string[]; error?: string }>;
 
     readExcelPreview: (filePath: string) => Promise<{
@@ -74,6 +156,11 @@ export interface ElectronAPI {
             row: number;
             message: string;
         }>;
+        matchedRows?: Array<{
+            sourceFile: string;
+            data: any[];
+            rowNumber: number;
+        }>;
         error?: string;
     }>;
 
@@ -81,6 +168,34 @@ export interface ElectronAPI {
     showInFolder: (filePath: string) => Promise<void>;
     saveFileDialog: (defaultPath: string) => Promise<{ canceled: boolean; filePath?: string }>;
     openFileDialog: (options: { multiple?: boolean; filters?: any[] }) => Promise<{ canceled: boolean; filePaths: string[] }>;
+
+    // Invoicing
+    saveInvoice: (invoice: Invoice) => Promise<{ success: boolean; id?: string; error?: string }>;
+    getInvoices: () => Promise<{ success: boolean; invoices?: Invoice[]; error?: string }>;
+    deleteInvoice: (id: string) => Promise<{ success: boolean; error?: string }>;
+    generateInvoicePDF: (invoice: Invoice) => Promise<{ success: boolean; filePath?: string; error?: string }>;
+    generateSecureInvoice: (invoice: Invoice, appUrl?: string) => Promise<{ success: boolean; error?: string }>;
+    onInvoiceData: (callback: (event: any, data: any) => void) => void;
+    sendPrintReady: () => void;
+    sendPrintWindowReady: () => void;
+
+    // Customers
+    saveCustomer: (customer: Customer) => Promise<{ success: boolean; id?: string; error?: string }>;
+    getCustomers: () => Promise<{ success: boolean; customers?: Customer[]; error?: string }>;
+    deleteCustomer: (id: string) => Promise<{ success: boolean; error?: string }>;
+    clearData: () => Promise<{ success: boolean; error?: string }>;
+    clearInvoices: () => Promise<{ success: boolean; error?: string }>;
+    backupData: () => Promise<{ success: boolean; error?: string }>;
+    restoreData: () => Promise<{ success: boolean; error?: string }>;
+
+    // Products
+    saveProduct: (product: Product) => Promise<{ success: boolean; id?: string; error?: string }>;
+    getProducts: () => Promise<{ success: boolean; products?: Product[]; error?: string }>;
+    deleteProduct: (id: string) => Promise<{ success: boolean; error?: string }>;
+
+    // Settings
+    saveBankingDetails: (details: BankingDetails) => Promise<{ success: boolean; error?: string }>;
+    getBankingDetails: () => Promise<{ success: boolean; data?: BankingDetails; error?: string }>;
 }
 
 declare global {
