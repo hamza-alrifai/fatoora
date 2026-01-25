@@ -196,6 +196,9 @@ export interface ElectronAPI {
     // Settings
     saveBankingDetails: (details: BankingDetails) => Promise<{ success: boolean; error?: string }>;
     getBankingDetails: () => Promise<{ success: boolean; data?: BankingDetails; error?: string }>;
+
+    // Reports
+    generateExecutiveSummary: (payload: { data: any[], filename?: string }) => Promise<{ success: boolean; error?: string }>;
 }
 
 declare global {

@@ -20,6 +20,7 @@ interface CustomerSheetProps {
 export function CustomerSheet({ isOpen, onClose, customer, onSave, onDelete, invoices }: CustomerSheetProps) {
     const [formData, setFormData] = useState<Customer | null>(null);
 
+
     useEffect(() => {
         if (customer) {
             setFormData({ ...customer });

@@ -260,6 +260,9 @@ export function InvoicePrintView() {
 
                     {/* Right: Customer Details */}
                     <div style={{ paddingLeft: '20px', borderLeft: '1px solid #eee' }}>
+                        <div style={{ fontSize: '11px', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#86868b', marginBottom: '8px' }}>
+                            Billed To
+                        </div>
                         <div style={{ fontSize: '15px', fontWeight: 600, color: '#1d1d1f', marginBottom: '4px' }}>
                             {data.to.name}
                         </div>

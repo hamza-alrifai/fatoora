@@ -28,7 +28,12 @@ import {
     Receipt,
     Plus,
     Trash2,
+    FileText,
+    TrendingUp,
+    DollarSign
 } from 'lucide-react';
+import * as XLSX from 'xlsx';
+import { generateExecutiveSummary, type CustomerSummary } from '@/utils/matcher-utils';
 
 interface FileConfig extends FileAnalysis {
     matchLabel?: string;
@@ -97,9 +102,102 @@ export function MatcherWorkspace({ currentStep, onStepChange }: MatcherWorkspace
     }> | null>(null);
 
     // Output file state (for invoice generation)
+    const [outputFileData, setOutputFileData] = useState<any[][]>([]);
+    const [outputFileHeaders, setOutputFileHeaders] = useState<{ name: string; index: number }[]>([]);
+
+    // Executive Summary State
+    const [showSummaryDialog, setShowSummaryDialog] = useState(false);
+    const [summaryColumnIndex, setSummaryColumnIndex] = useState<number>(-1);
+    const [summaryRate10, setSummaryRate10] = useState<string>('25');
+    const [summaryRate20, setSummaryRate20] = useState<string>('30');
+    const [executiveSummary, setExecutiveSummary] = useState<CustomerSummary[] | null>(null);
+
+    const handleGenerateSummary = () => {
+        if (summaryColumnIndex === -1) {
+            toast.error("Please select a customer column");
+            return;
+        }
+
+        const guessed = guessColumns(outputFileHeaders.map(h => h.name));
+        // Use guessed columns or defaults if not found
+        const descCol = guessed.descriptionColIdx;
+        const qtyCol = guessed.quantityColIdx;
+
+        try {
+            const summary = generateExecutiveSummary(
+                outputFileData,
+                summaryColumnIndex,
+                qtyCol,
+                descCol,
+                parseFloat(summaryRate10 || '0'),
+                parseFloat(summaryRate20 || '0')
+            );
+            setExecutiveSummary(summary);
+            setShowSummaryDialog(false);
+            toast.success("Executive Summary Generated!");
+        } catch (e) {
+            console.error(e);
+            toast.error("Failed to generate summary");
+        }
+    };
+
+    const handleExportSummary = () => {
+        if (!executiveSummary) return;
+
+        // Prepare data for export
+        const exportData = executiveSummary.map((s, idx) => ({
+            'Serial': (idx + 1).toString(),
+            'Customer': s.name,
+            'Total Qty (MT)': s.totalQty,
+            '10mm Qty (MT)': s.total10mm,
+            '20mm Qty (MT)': s.total20mm,
+            '10mm %': s.percentage10mm + '%',
+            '20mm %': s.percentage20mm + '%',
+            '10mm Trips': s.trips10mm,
+            '20mm Trips': s.trips20mm,
+            'Total Trips': s.trips10mm + s.trips20mm,
+            'Invoice No': s.invoiceNo,
+            'Excess 10mm': s.excess10mm,
+            'Total Value': s.totalAmount
+        }));
+
+        // Add Grand Total row
+        const totals = executiveSummary.reduce((acc, s) => ({
+            totalQty: acc.totalQty + s.totalQty,
+            total10mm: acc.total10mm + s.total10mm,
+            total20mm: acc.total20mm + s.total20mm,
+            trips10mm: acc.trips10mm + s.trips10mm,
+            trips20mm: acc.trips20mm + s.trips20mm,
+            totalAmount: acc.totalAmount + s.totalAmount,
+            excess10mm: acc.excess10mm + s.excess10mm
+        }), { totalQty: 0, total10mm: 0, total20mm: 0, trips10mm: 0, trips20mm: 0, totalAmount: 0, excess10mm: 0 });
+
+        exportData.push({
+            'Serial': '',
+            'Customer': 'GRAND TOTAL',
+            'Total Qty (MT)': totals.totalQty,
+            '10mm Qty (MT)': totals.total10mm,
+            '20mm Qty (MT)': totals.total20mm,
+            '10mm %': '',
+            '20mm %': '',
+            '10mm Trips': totals.trips10mm,
+            '20mm Trips': totals.trips20mm,
+            'Total Trips': totals.trips10mm + totals.trips20mm,
+            'Invoice No': '',
+            'Excess 10mm': totals.excess10mm,
+            'Total Value': totals.totalAmount
+        });
+
+        const ws = XLSX.utils.json_to_sheet(exportData);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Executive Summary");
+
+        // Generate filename with date
+        const dateStr = new Date().toISOString().split('T')[0];
+        XLSX.writeFile(wb, `Fatoora_Executive_Summary_${dateStr}.xlsx`);
+        toast.success("Report downloaded successfully!");
+    };
     const [outputFilePath, setOutputFilePath] = useState<string | null>(null);
-    const [outputFileHeaders, setOutputFileHeaders] = useState<Array<{ index: number; name: string }>>([]);
-    const [outputFileData, setOutputFileData] = useState<any[][] | []>([]);
     const [uniqueMatchValues, setUniqueMatchValues] = useState<string[]>([]);
 
     // Sync local step with prop if needed, or just use prop. We use prop `currentStep`.
@@ -268,6 +366,7 @@ export function MatcherWorkspace({ currentStep, onStepChange }: MatcherWorkspace
                 setCreatingCustomerForTargetIndex(null);
             }
 
+            setIsCustomerDialogOpen(false); // Close the entire dialog
             setIsCreatingCustomer(false);
             setNewCustomerData({ name: '', email: '', phone: '', address: '' });
         } else {
@@ -378,11 +477,17 @@ export function MatcherWorkspace({ currentStep, onStepChange }: MatcherWorkspace
             const p20 = productRes.products.find((p: any) => p.type === '20mm');
             if (p10) defaultRate10 = p10.rate;
             if (p20) defaultRate20 = p20.rate;
+        } else {
+            toast.warning("Could not load product rates. Please set rates manually.");
         }
 
         // Create config for OUTPUT file
         const outputHeaders = outputFileHeaders.map(h => h.name);
         const outputGuessed = guessColumns(outputHeaders);
+        const lastColIdx = outputFileHeaders.length > 0 ? outputFileHeaders[outputFileHeaders.length - 1].index : -1;
+
+        // Existing or default result column
+        const resultColIdx = fileGenConfigs['output']?.resultColIdx ?? lastColIdx; // Use existing if set, else guess last
 
         const newConfigs: Record<string, FileGenConfig> = {
             // Output file config (for master file invoicing)
@@ -391,7 +496,8 @@ export function MatcherWorkspace({ currentStep, onStepChange }: MatcherWorkspace
                 rate10: defaultRate10,
                 rate20: defaultRate20,
                 descriptionColIdx: outputGuessed.descriptionColIdx,
-                quantityColIdx: outputGuessed.quantityColIdx
+                quantityColIdx: outputGuessed.quantityColIdx,
+                resultColIdx: resultColIdx
             }
         };
 
@@ -409,6 +515,68 @@ export function MatcherWorkspace({ currentStep, onStepChange }: MatcherWorkspace
                 quantityColIdx: guessed.quantityColIdx
             };
         });
+
+        // AUTO-SCAN: Scan for unique values immediately using the determined resultColIdx
+        if (resultColIdx !== -1 && outputFileData.length > 0) {
+            const headerName = outputFileHeaders.find(h => h.index === resultColIdx)?.name || '';
+            const unique = new Set<string>();
+            const dataRows = outputFileData.slice(1);
+
+            dataRows.forEach(row => {
+                const val = String(row[resultColIdx] || '').trim();
+                // Filter out empty, "not matched", and THE HEADER ITSELF
+                if (val &&
+                    val.toLowerCase() !== 'not matched' &&
+                    val !== noMatchLabel &&
+                    val !== headerName) {
+                    unique.add(val);
+                }
+            });
+
+            const sorted = Array.from(unique).sort();
+            setUniqueMatchValues(sorted);
+
+            // Generate configs for these found groups
+            const findBestMatchConfig = (groupName: string) => {
+                const groupLower = groupName.toLowerCase();
+                const target = targetConfigs.find(t => {
+                    const fName = (t.fileName || '').toLowerCase();
+                    const fPath = (t.filePath || '').toLowerCase();
+                    return fName === groupLower ||
+                        fName.includes(groupLower) ||
+                        groupLower.includes(fName) ||
+                        fPath.includes(groupLower);
+                });
+                if (target && target.filePath && fileGenConfigs[target.filePath]) { // Check against PREV state is tricky, use newConfigs if we just added it?
+                    // Actually we want to check if we have any existing preferences. 
+                    // Ideally we check newConfigs[target.filePath] which effectively copies old config if it existed.
+                    if (target.filePath && newConfigs[target.filePath]) return newConfigs[target.filePath];
+                }
+                return null;
+            };
+
+            sorted.forEach(val => {
+                // If we don't already have a config for this group...
+                if (!fileGenConfigs[val]) { // checking prev state
+                    const existing = findBestMatchConfig(val);
+                    newConfigs[val] = {
+                        customerId: existing?.customerId || null,
+                        rate10: existing?.rate10 || defaultRate10,
+                        rate20: existing?.rate20 || defaultRate20,
+                        descriptionColIdx: 0,
+                        quantityColIdx: 0
+                    };
+                } else {
+                    // Start with existing
+                    newConfigs[val] = fileGenConfigs[val];
+                }
+            });
+
+            if (sorted.length > 0) {
+                // optional toast, maybe too noisy on open
+                // toast.info(`Found ${sorted.length} unique groups.`);
+            }
+        }
 
         setFileGenConfigs(newConfigs);
 
@@ -503,7 +671,10 @@ export function MatcherWorkspace({ currentStep, onStepChange }: MatcherWorkspace
 
                     if (!isNaN(parsed) && parsed > 0) quantity = parsed;
                 }
-                if (quantity > 100000) quantity = 0; // Sanity
+                if (quantity > 1000000) {
+                    console.warn(`Row ${idx + 2}: Unusually high quantity ${quantity}, please verify`);
+                    quantity = 0; // Skip likely invalid row
+                }
 
                 // D. Add to List with Aggregation
                 if (!invoiceItemsByCustomer[customerId]) {
@@ -517,14 +688,14 @@ export function MatcherWorkspace({ currentStep, onStepChange }: MatcherWorkspace
                 if (customerMap.has(key)) {
                     const existing = customerMap.get(key);
                     existing.quantity += quantity;
-                    existing.amount = existing.quantity * existing.unitPrice;
+                    existing.amount = Math.round(existing.quantity * existing.unitPrice * 100) / 100;
                 } else {
                     customerMap.set(key, {
                         id: crypto.randomUUID(),
                         description: description,
                         quantity: quantity,
                         unitPrice: rate,
-                        amount: quantity * rate,
+                        amount: Math.round(quantity * rate * 100) / 100,
                         type: type
                     });
                 }
@@ -561,7 +732,7 @@ export function MatcherWorkspace({ currentStep, onStepChange }: MatcherWorkspace
 
                 const newInvoice: any = {
                     id: crypto.randomUUID(),
-                    number: `INV-${Date.now().toString().slice(-6)}`,
+                    number: 'DRAFT', // Backend will assign next sequence number
                     date: new Date().toISOString(),
                     status: 'draft', // Type assertion via :any handled
                     from: {
@@ -648,6 +819,8 @@ export function MatcherWorkspace({ currentStep, onStepChange }: MatcherWorkspace
         return 'text-muted-foreground';
     };
 
+
+
     return (
         <div className="flex flex-col h-full bg-background overflow-hidden relative">
             {/* Main Content only - Sidebar removed */}
@@ -660,24 +833,27 @@ export function MatcherWorkspace({ currentStep, onStepChange }: MatcherWorkspace
                     <div className="flex items-center gap-2">
                         {/* Generate Invoice Button in Results Step */}
                         {currentStep === 'done' && outputFileData.length > 0 && (
-                            <Button
-                                size="sm"
-                                onClick={handlePrepareGeneration}
-                                disabled={isGeneratingInvoices}
-                                className="bg-primary hover:bg-primary/90 text-primary-foreground"
-                            >
-                                {isGeneratingInvoices ? (
-                                    <>
-                                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                                        Generating...
-                                    </>
-                                ) : (
-                                    <>
-                                        <Receipt className="w-4 h-4 mr-2" />
-                                        Generate Invoices
-                                    </>
-                                )}
-                            </Button>
+                            <>
+
+                                <Button
+                                    size="sm"
+                                    onClick={handlePrepareGeneration}
+                                    disabled={isGeneratingInvoices}
+                                    className="bg-primary hover:bg-primary/90 text-primary-foreground"
+                                >
+                                    {isGeneratingInvoices ? (
+                                        <>
+                                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                            Generating...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Receipt className="w-4 h-4 mr-2" />
+                                            Generate Invoices
+                                        </>
+                                    )}
+                                </Button>
+                            </>
                         )}
                         <Button variant="ghost" size="sm" onClick={reset} className="text-muted-foreground">
                             <RefreshCw className="w-4 h-4 mr-2" />
@@ -810,13 +986,6 @@ export function MatcherWorkspace({ currentStep, onStepChange }: MatcherWorkspace
                                                         </div>
                                                     </div>
                                                 </div>
-                                                {targetConfigs.length > 0 && (
-                                                    <div className="flex items-center gap-3 py-2">
-                                                        <div className="flex-1 h-px bg-border"></div>
-                                                        <span className="text-xs text-muted-foreground font-medium">Target Files</span>
-                                                        <div className="flex-1 h-px bg-border"></div>
-                                                    </div>
-                                                )}
                                             </>
                                         )}
                                         {/* TARGET FILES SECTION */}
@@ -867,7 +1036,7 @@ export function MatcherWorkspace({ currentStep, onStepChange }: MatcherWorkspace
                                                                         className="h-9 px-2 text-right font-mono"
                                                                         placeholder="0.00"
                                                                         value={config.rate10 || ''}
-                                                                        onChange={(e) => updateFileConfig(matchVal, { rate10: parseFloat(e.target.value) })}
+                                                                        onChange={(e) => updateFileConfig(matchVal, { rate10: parseFloat(e.target.value) || 0 })}
                                                                     />
                                                                     <span className="absolute left-2 top-2.5 text-xs text-muted-foreground">QAR</span>
                                                                 </div>
@@ -880,7 +1049,7 @@ export function MatcherWorkspace({ currentStep, onStepChange }: MatcherWorkspace
                                                                         className="h-9 px-2 text-right font-mono"
                                                                         placeholder="0.00"
                                                                         value={config.rate20 || ''}
-                                                                        onChange={(e) => updateFileConfig(matchVal, { rate20: parseFloat(e.target.value) })}
+                                                                        onChange={(e) => updateFileConfig(matchVal, { rate20: parseFloat(e.target.value) || 0 })}
                                                                     />
                                                                     <span className="absolute left-2 top-2.5 text-xs text-muted-foreground">QAR</span>
                                                                 </div>
@@ -1332,14 +1501,160 @@ export function MatcherWorkspace({ currentStep, onStepChange }: MatcherWorkspace
                                     </Card>
                                 )}
 
-                                <div className="flex justify-center">
+                                <div className="flex justify-center gap-4">
                                     <Button size="lg" variant="outline" onClick={reset}>
                                         <RefreshCw className="w-4 h-4 mr-2" />
                                         New Match
                                     </Button>
+                                    <Button size="lg" className="bg-gradient-to-r from-indigo-500 to-purple-600 border-0" onClick={() => setShowSummaryDialog(true)}>
+                                        <TrendingUp className="w-4 h-4 mr-2" />
+                                        Executive Summary
+                                    </Button>
                                 </div>
+
+                                {executiveSummary && (
+                                    <Card className="border-indigo-500/20 bg-indigo-500/5">
+                                        <CardHeader>
+                                            <div className="flex items-center justify-between">
+                                                <div className="space-y-1">
+                                                    <CardTitle className="text-xl flex items-center gap-2">
+                                                        <TrendingUp className="w-5 h-5 text-indigo-500" />
+                                                        Executive Summary
+                                                    </CardTitle>
+                                                    <CardDescription>Grouped by {outputFileHeaders.find(h => h.index === summaryColumnIndex)?.name}</CardDescription>
+                                                </div>
+                                                <Button variant="outline" size="sm" onClick={handleExportSummary}>
+                                                    <Download className="w-4 h-4 mr-2" />
+                                                    Export to Excel
+                                                </Button>
+                                            </div>
+                                        </CardHeader>
+                                        <CardContent>
+                                            <div className="rounded-md border bg-background overflow-x-auto">
+                                                <table className="w-full text-xs">
+                                                    <thead className="bg-secondary/50">
+                                                        <tr>
+                                                            <th className="px-2 py-2 text-left font-medium">Serial</th>
+                                                            <th className="px-2 py-2 text-left font-medium">Customer</th>
+                                                            <th className="px-2 py-2 text-right font-medium">Total Qty (MT)</th>
+                                                            <th className="px-2 py-2 text-right font-medium text-slate-500">10mm Qty</th>
+                                                            <th className="px-2 py-2 text-right font-medium text-primary">20mm Qty</th>
+                                                            <th className="px-2 py-2 text-right font-medium">10mm %</th>
+                                                            <th className="px-2 py-2 text-right font-medium">20mm %</th>
+                                                            <th className="px-2 py-2 text-right font-medium">10mm Trips</th>
+                                                            <th className="px-2 py-2 text-right font-medium">20mm Trips</th>
+                                                            <th className="px-2 py-2 text-right font-medium">Total Trips</th>
+                                                            <th className="px-2 py-2 text-left font-medium">Inv No</th>
+                                                            <th className="px-2 py-2 text-right font-medium text-amber-600">Excess 10mm</th>
+                                                            <th className="px-2 py-2 text-right font-medium text-green-600">Total Value</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody className="divide-y">
+                                                        {executiveSummary.map((sum, idx) => (
+                                                            <tr key={idx} className="hover:bg-secondary/20 transition-colors">
+                                                                <td className="px-2 py-2 text-muted-foreground">{idx + 1}</td>
+                                                                <td className="px-2 py-2 font-medium truncate max-w-[150px]">{sum.name}</td>
+                                                                <td className="px-2 py-2 text-right font-mono">{sum.totalQty.toLocaleString()}</td>
+                                                                <td className="px-2 py-2 text-right font-mono">{sum.total10mm.toLocaleString()}</td>
+                                                                <td className="px-2 py-2 text-right font-mono">{sum.total20mm.toLocaleString()}</td>
+                                                                <td className="px-2 py-2 text-right font-mono text-muted-foreground">{sum.percentage10mm}%</td>
+                                                                <td className="px-2 py-2 text-right font-mono text-muted-foreground">{sum.percentage20mm}%</td>
+                                                                <td className="px-2 py-2 text-right font-mono">{sum.trips10mm}</td>
+                                                                <td className="px-2 py-2 text-right font-mono">{sum.trips20mm}</td>
+                                                                <td className="px-2 py-2 text-right font-mono font-medium">{sum.trips10mm + sum.trips20mm}</td>
+                                                                <td className="px-2 py-2 text-muted-foreground">-</td>
+                                                                <td className="px-2 py-2 text-right font-mono text-amber-600">
+                                                                    {sum.excess10mm > 0 ? sum.excess10mm.toLocaleString() : '-'}
+                                                                </td>
+                                                                <td className="px-2 py-2 text-right font-mono font-bold text-green-600">
+                                                                    {sum.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                                                </td>
+                                                            </tr>
+                                                        ))}
+                                                        {/* Totals Row */}
+                                                        <tr className="bg-secondary/30 font-bold text-xs">
+                                                            <td className="px-2 py-2"></td>
+                                                            <td className="px-2 py-2">GRAND TOTAL</td>
+                                                            <td className="px-2 py-2 text-right">{executiveSummary.reduce((acc, s) => acc + s.totalQty, 0).toLocaleString()}</td>
+                                                            <td className="px-2 py-2 text-right">{executiveSummary.reduce((acc, s) => acc + s.total10mm, 0).toLocaleString()}</td>
+                                                            <td className="px-2 py-2 text-right">{executiveSummary.reduce((acc, s) => acc + s.total20mm, 0).toLocaleString()}</td>
+                                                            <td className="px-2 py-2" colSpan={2}></td>
+                                                            <td className="px-2 py-2 text-right">{executiveSummary.reduce((acc, s) => acc + s.trips10mm, 0)}</td>
+                                                            <td className="px-2 py-2 text-right">{executiveSummary.reduce((acc, s) => acc + s.trips20mm, 0)}</td>
+                                                            <td className="px-2 py-2 text-right">{executiveSummary.reduce((acc, s) => acc + (s.trips10mm + s.trips20mm), 0)}</td>
+                                                            <td className="px-2 py-2"></td>
+                                                            <td className="px-2 py-2 text-right text-amber-600">
+                                                                {executiveSummary.reduce((acc, s) => acc + s.excess10mm, 0).toLocaleString()}
+                                                            </td>
+                                                            <td className="px-2 py-2 text-right text-green-600">
+                                                                {executiveSummary.reduce((acc, s) => acc + s.totalAmount, 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                                            </td>
+                                                        </tr>
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </CardContent>
+                                    </Card>
+                                )}
                             </div>
                         )}
+
+                        <GlassDialog
+                            isOpen={showSummaryDialog}
+                            onClose={() => setShowSummaryDialog(false)}
+                            title="Generate Executive Summary"
+                            description="Select the customer column and verify rates to generate a report."
+                        >
+                            <div className="space-y-4 py-4">
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium">Customer Column</label>
+                                    <select
+                                        className="w-full h-10 rounded-md border border-input bg-background/50 px-3 text-sm focus:border-primary"
+                                        value={summaryColumnIndex}
+                                        onChange={(e) => setSummaryColumnIndex(parseInt(e.target.value))}
+                                    >
+                                        <option value={-1}>Select column...</option>
+                                        {outputFileHeaders.map(h => (
+                                            <option key={h.index} value={h.index}>{h.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-medium">10mm Rate</label>
+                                        <div className="relative">
+                                            <DollarSign className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                                            <Input
+                                                type="number"
+                                                className="pl-9"
+                                                value={summaryRate10}
+                                                onChange={(e) => setSummaryRate10(e.target.value)}
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-medium">20mm Rate</label>
+                                        <div className="relative">
+                                            <DollarSign className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                                            <Input
+                                                type="number"
+                                                className="pl-9"
+                                                value={summaryRate20}
+                                                onChange={(e) => setSummaryRate20(e.target.value)}
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="flex justify-end pt-4">
+                                    <Button onClick={handleGenerateSummary} disabled={summaryColumnIndex === -1}>
+                                        <FileText className="w-4 h-4 mr-2" />
+                                        Generate Report
+                                    </Button>
+                                </div>
+                            </div>
+                        </GlassDialog>
                     </div>
                 </ScrollArea>
             </main>

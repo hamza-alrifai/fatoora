@@ -44,6 +44,12 @@ contextBridge.exposeInMainWorld('electron', {
     saveBankingDetails: (details: any) => ipcRenderer.invoke('settings:saveBanking', details),
     getBankingDetails: () => ipcRenderer.invoke('settings:getBanking'),
 
+    // Reports
+    generateExecutiveSummary: (payload: any) => ipcRenderer.invoke('reports:executive-summary', payload),
+
+    // Invoicing Utilities
+    getNextInvoiceNumber: () => ipcRenderer.invoke('invoice:nextNumber'),
+
     // Secure Printing
     generateSecureInvoice: (invoice: any, appUrl?: string) => ipcRenderer.invoke('invoice:generate-secure', invoice, appUrl),
     onInvoiceData: (callback: (event: any, data: any) => void) => ipcRenderer.on('print-data', callback),

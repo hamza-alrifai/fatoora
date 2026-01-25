@@ -144,7 +144,6 @@ export function CustomerWorkspace() {
                     </CardContent>
                 </Card>
                 <div className="flex items-end justify-end gap-2">
-
                     <Button
                         size="lg"
                         className="h-10 px-6 rounded-lg shadow-lg shadow-primary/20 bg-primary hover:bg-primary/90 transition-all"

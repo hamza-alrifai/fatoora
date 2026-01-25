@@ -162,7 +162,7 @@ export function Dashboard() {
                                 ) : (
                                     recentInvoices.map((inv) => (
                                         <TableRow key={inv.id} className="border-white/5 hover:bg-white/5 transition-colors">
-                                            <TableCell className="font-mono font-medium">{inv.number}</TableCell>
+                                            <TableCell className="font-mono font-medium">{inv.number === 'DRAFT' ? 'Processing...' : inv.number}</TableCell>
                                             <TableCell>{inv.to.name}</TableCell>
                                             <TableCell className="text-muted-foreground text-xs">
                                                 {format(new Date(inv.date), 'MMM d, yyyy')}
@@ -196,7 +196,7 @@ export function Dashboard() {
                     <CardHeader className="pb-2 flex-none">
                         <CardTitle className="flex items-center gap-2 text-base">
                             <CalendarClock className="w-5 h-5 text-indigo-500" />
-                            Overdue Aging
+                            Invoice Aging (Issuance)
                         </CardTitle>
                     </CardHeader>
                     <CardContent className="flex-1 overflow-y-auto pr-2 space-y-6 pt-4 custom-scrollbar">
@@ -219,25 +219,26 @@ export function Dashboard() {
                                 return '90+ Days';
                             };
 
-                            // Get Overdue Invoices
-                            const overdueInvoices = allInvoices
-                                .filter(inv => inv.status === 'overdue' || (inv.status !== 'paid' && inv.status !== 'draft' && new Date(inv.dueDate || inv.date) < new Date()))
+                            // Get Aging Invoices (Issuance Based)
+                            const agingInvoices = allInvoices
+                                .filter(inv => inv.status !== 'paid' && inv.status !== 'draft')
                                 .map(inv => {
-                                    const dueDate = inv.dueDate ? new Date(inv.dueDate) : new Date(inv.date);
-                                    const diffTime = new Date().getTime() - dueDate.getTime();
-                                    const daysOverdue = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-                                    return { ...inv, daysOverdue, bucket: getBucket(daysOverdue) };
+                                    // Age based on Issuance Date (inv.date)
+                                    const issueDate = new Date(inv.date);
+                                    const diffTime = new Date().getTime() - issueDate.getTime();
+                                    const ageDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+                                    return { ...inv, daysOverdue: ageDays, bucket: getBucket(ageDays) };
                                 });
 
                             // Calculate stats per bucket
                             const buckets = ['0 - 30 Days', '31 - 60 Days', '61 - 90 Days', '90+ Days'];
                             const groupedInvoices = buckets.map(bucket => {
-                                const invoices = overdueInvoices.filter(inv => inv.bucket === bucket).sort((a, b) => b.daysOverdue - a.daysOverdue);
+                                const invoices = agingInvoices.filter(inv => inv.bucket === bucket).sort((a, b) => b.daysOverdue - a.daysOverdue);
                                 const total = invoices.reduce((acc, inv) => acc + inv.total, 0);
                                 return { bucket, invoices, total };
                             });
 
-                            if (overdueInvoices.length === 0) {
+                            if (agingInvoices.length === 0) {
                                 return (
                                     <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground space-y-2">
                                         <p className="text-sm">No overdue invoices found.</p>
@@ -274,7 +275,7 @@ export function Dashboard() {
                                                                 </div>
                                                                 <div className="flex flex-col min-w-0">
                                                                     <span className="text-sm font-medium truncate max-w-[120px]" title={inv.to.name}>{inv.to.name}</span>
-                                                                    <span className="text-[10px] text-muted-foreground font-mono">{inv.number}</span>
+                                                                    <span className="text-[10px] text-muted-foreground font-mono">{inv.number === 'DRAFT' ? 'Gen...' : inv.number}</span>
                                                                 </div>
                                                             </div>
                                                             <div className="text-right shrink-0">

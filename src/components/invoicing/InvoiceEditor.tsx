@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
 import { Save, Trash2, Printer, Receipt } from 'lucide-react';
+import { calculateAmount, calculateSubtotal } from '@/utils/calculations';
 
 
 interface InvoiceEditorProps {
@@ -31,9 +32,9 @@ export function InvoiceEditor({ invoice: initialInvoice, onSave, onDelete, onGen
                 amount: acc.amount + curr.amount
             }), { id: 'fixed-20', description: 'Gabbro 20mm', quantity: 0, unitPrice: items20mm[0]?.unitPrice || 0, amount: 0, type: '20mm' });
 
-            // Recalculate amount based on total qty if price exists (to fix potential math errors in DB)
+            // Recalculate amount using utility for consistent rounding
             if (merged20mm.quantity > 0 && merged20mm.unitPrice > 0) {
-                merged20mm.amount = merged20mm.quantity * merged20mm.unitPrice;
+                merged20mm.amount = calculateAmount(merged20mm.quantity, merged20mm.unitPrice);
             }
 
             const merged10mm = items10mm.reduce((acc, curr) => ({
@@ -43,7 +44,7 @@ export function InvoiceEditor({ invoice: initialInvoice, onSave, onDelete, onGen
             }), { id: 'fixed-10', description: 'Gabbro 10mm', quantity: 0, unitPrice: items10mm[0]?.unitPrice || 0, amount: 0, type: '10mm' });
 
             if (merged10mm.quantity > 0 && merged10mm.unitPrice > 0) {
-                merged10mm.amount = merged10mm.quantity * merged10mm.unitPrice;
+                merged10mm.amount = calculateAmount(merged10mm.quantity, merged10mm.unitPrice);
             }
 
             const cleanList = [merged20mm, merged10mm];
@@ -52,7 +53,7 @@ export function InvoiceEditor({ invoice: initialInvoice, onSave, onDelete, onGen
         };
 
         setInvoice(sanitizeItems(initialInvoice));
-    }, [initialInvoice.id]);
+    }, [initialInvoice]);
 
     useEffect(() => {
         loadCustomers();
@@ -115,12 +116,12 @@ export function InvoiceEditor({ invoice: initialInvoice, onSave, onDelete, onGen
 
 
     const handleSave = () => {
-        // Ensure we only save the clean items
-        onSave(invoice);
+        // Recalculate totals before saving to ensure consistency
+        onSave(recalculateTotals(invoice));
     };
 
     const recalculateTotals = (inv: Invoice): Invoice => {
-        const subtotal = inv.items.reduce((sum, item) => sum + item.amount, 0);
+        const subtotal = calculateSubtotal(inv.items);
         return {
             ...inv,
             subtotal,
@@ -150,7 +151,11 @@ export function InvoiceEditor({ invoice: initialInvoice, onSave, onDelete, onGen
                     <Button
                         onClick={() => {
                             if (window.confirm("Mark as ISSUED and download PDF?\n\nThis will assume the invoice is finalized.")) {
-                                const issuedInvoice = { ...invoice, status: 'issued' as const };
+                                const issuedInvoice = {
+                                    ...invoice,
+                                    status: 'issued' as const,
+                                    date: new Date().toISOString().split('T')[0] // Set date to today on issue
+                                };
                                 setInvoice(issuedInvoice);
                                 onSave(issuedInvoice);
                                 onGeneratePDF(issuedInvoice);
@@ -194,10 +199,10 @@ export function InvoiceEditor({ invoice: initialInvoice, onSave, onDelete, onGen
                                 <div className="flex items-center justify-end gap-3 relative z-10">
                                     <span className="text-sm font-medium text-muted-foreground">#</span>
                                     <Input
-                                        value={invoice.number}
-                                        onChange={(e) => handleChange('number', e.target.value)}
-                                        className="w-40 text-right font-mono text-xl font-bold bg-transparent border-none focus-visible:ring-0 p-0 h-auto placeholder:text-muted-foreground/30 text-foreground"
-                                        placeholder="INV-000"
+                                        value={invoice.number === 'DRAFT' ? 'Auto-Generated' : invoice.number}
+                                        readOnly
+                                        className="w-40 text-right font-mono text-xl font-bold bg-transparent border-none focus-visible:ring-0 p-0 h-auto placeholder:text-muted-foreground/30 text-foreground cursor-not-allowed opacity-70"
+                                        placeholder="Auto-Generated"
                                     />
                                 </div>
                             </div>
@@ -222,7 +227,7 @@ export function InvoiceEditor({ invoice: initialInvoice, onSave, onDelete, onGen
                     </div>
 
                     {/* Dates & Reference Bar */}
-                    <div className="grid grid-cols-4 gap-6 p-6 rounded-xl bg-white/5 border border-white/5">
+                    <div className="grid grid-cols-3 gap-6 p-6 rounded-xl bg-white/5 border border-white/5">
                         <div className="space-y-2">
                             <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Date Issued</label>
                             <Input
@@ -241,6 +246,8 @@ export function InvoiceEditor({ invoice: initialInvoice, onSave, onDelete, onGen
                                 className="bg-white/5 border-white/10 focus:bg-white/10 h-10 transition-all font-medium"
                             />
                         </div>
+                        <div className="hidden md:block"></div> {/* Spacer to fill row if needed, or just let it wrap naturally */}
+
                         <div className="space-y-2">
                             <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">LPO Number</label>
                             <Input
@@ -251,12 +258,32 @@ export function InvoiceEditor({ invoice: initialInvoice, onSave, onDelete, onGen
                             />
                         </div>
                         <div className="space-y-2">
-                            <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Offer Ref</label>
+                            <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">LPO Date</label>
+                            <Input
+                                type="date"
+                                value={invoice.lpoDate || ''}
+                                onChange={(e) => handleChange('lpoDate', e.target.value)}
+                                className="bg-white/5 border-white/10 focus:bg-white/10 h-10 transition-all font-medium"
+                            />
+                        </div>
+                        <div className="hidden md:block"></div>
+
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Commercial Offer Ref</label>
                             <Input
                                 value={invoice.commercialOfferRef || ''}
                                 onChange={(e) => handleChange('commercialOfferRef', e.target.value)}
                                 className="bg-white/5 border-white/10 focus:bg-white/10 h-10 transition-all placeholder:text-muted-foreground/30"
                                 placeholder="Optional"
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Commercial Offer Date</label>
+                            <Input
+                                type="date"
+                                value={invoice.commercialOfferDate || ''}
+                                onChange={(e) => handleChange('commercialOfferDate', e.target.value)}
+                                className="bg-white/5 border-white/10 focus:bg-white/10 h-10 transition-all font-medium"
                             />
                         </div>
                     </div>
@@ -323,9 +350,10 @@ export function InvoiceEditor({ invoice: initialInvoice, onSave, onDelete, onGen
                                             type="number"
                                             value={item.quantity}
                                             onChange={(e) => {
-                                                const val = parseFloat(e.target.value);
+                                                const val = parseFloat(e.target.value) || 0;
                                                 const newItems = [...invoice.items];
-                                                newItems[index] = { ...item, quantity: val, amount: val * item.unitPrice };
+                                                const amount = Math.round(val * item.unitPrice * 100) / 100;
+                                                newItems[index] = { ...item, quantity: val, amount };
                                                 setInvoice(recalculateTotals({ ...invoice, items: newItems }));
                                             }}
                                             className="text-right bg-white/5 border-transparent hover:border-white/10 focus:border-primary/50 focus:bg-white/10 h-10 px-3 font-mono text-muted-foreground focus:text-foreground transition-all"
@@ -337,9 +365,10 @@ export function InvoiceEditor({ invoice: initialInvoice, onSave, onDelete, onGen
                                             type="number"
                                             value={item.unitPrice}
                                             onChange={(e) => {
-                                                const val = parseFloat(e.target.value);
+                                                const val = parseFloat(e.target.value) || 0;
                                                 const newItems = [...invoice.items];
-                                                newItems[index] = { ...item, unitPrice: val, amount: item.quantity * val };
+                                                const amount = Math.round(item.quantity * val * 100) / 100;
+                                                newItems[index] = { ...item, unitPrice: val, amount };
                                                 setInvoice(recalculateTotals({ ...invoice, items: newItems }));
                                             }}
                                             className="text-right bg-white/5 border-transparent hover:border-white/10 focus:border-primary/50 focus:bg-white/10 h-10 px-3 font-mono text-muted-foreground focus:text-foreground transition-all"

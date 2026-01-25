@@ -34,7 +34,13 @@ async function getDB() {
     // However, let's be safe.
 
     if (!dbInstance) {
-        dbInstance = await JSONFilePreset(dbPath, { customers: [], invoices: [], products: [], bankingDetails: null });
+        dbInstance = await JSONFilePreset(dbPath, {
+            customers: [],
+            invoices: [],
+            products: [],
+            bankingDetails: null,
+            lastInvoiceNumber: 613 // Start from 613 so next is 614
+        });
 
         // ONE-TIME CLEANUP (Deleting old JSON files and folders)
         try {
@@ -99,6 +105,16 @@ ipcMain.handle('customer:list', async () => {
 ipcMain.handle('customer:delete', async (_, id: string) => {
     try {
         const db = await getDB();
+
+        // Check for linked invoices before deletion
+        const linkedInvoices = db.data.invoices.filter((inv: any) => inv.to?.customerId === id);
+        if (linkedInvoices.length > 0) {
+            return {
+                success: false,
+                error: `Cannot delete: ${linkedInvoices.length} invoice(s) are linked to this customer. Clear them first or reassign.`
+            };
+        }
+
         const initialLen = db.data.customers.length;
         db.data.customers = db.data.customers.filter((c: any) => c.id !== id);
         if (db.data.customers.length !== initialLen) {
@@ -115,11 +131,35 @@ ipcMain.handle('customer:delete', async (_, id: string) => {
 ipcMain.handle('invoice:save', async (_, invoice: any) => {
     try {
         const db = await getDB();
-        if (!invoice.id) {
+
+        // Ensure lastInvoiceNumber exists (migration-like safety)
+        if (typeof db.data.lastInvoiceNumber !== 'number') {
+            db.data.lastInvoiceNumber = 613;
+        }
+
+        const isNew = !invoice.id;
+        if (isNew) {
             invoice.id = uuidv4();
             invoice.createdAt = new Date().toISOString();
         }
         invoice.updatedAt = new Date().toISOString();
+
+        // 1. Check if we need to assign a number
+        // Condition: Top-level creation (isNew) OR explicit request via placeholder
+        // We only assign if it doesn't have a valid sequential number yet.
+        // Simple check: If it starts with 'INV-' (old timestamp) or is 'DRAFT' or empty
+        const currentNum = String(invoice.number || '');
+        const needsNumber = isNew || currentNum === 'DRAFT' || currentNum.startsWith('INV-');
+
+        if (needsNumber) {
+            db.data.lastInvoiceNumber += 1;
+            const nextNum = db.data.lastInvoiceNumber;
+            // Pad if desired, but user asked for "#614" format (implied simple number or # prefix)
+            // Let's stick to simple number "614" stored, maybe formatted on display?
+            // "make invoicing number start from #614" -> implies value is 614.
+            invoice.number = String(nextNum);
+            invoice.invoiceNumber = String(nextNum); // Legacy support if needed
+        }
 
         const idx = db.data.invoices.findIndex((inv: any) => inv.id === invoice.id);
         if (idx >= 0) {
@@ -128,7 +168,7 @@ ipcMain.handle('invoice:save', async (_, invoice: any) => {
             db.data.invoices.push(invoice);
         }
         await db.write();
-        return { success: true, id: invoice.id };
+        return { success: true, id: invoice.id, number: invoice.number };
     } catch (e: any) {
         return { success: false, error: e.message };
     }
@@ -139,22 +179,20 @@ ipcMain.handle('invoice:list', async () => {
     try {
         const db = await getDB();
 
-        // Auto-Check Overdue Status
-        const now = new Date();
-        now.setHours(0, 0, 0, 0); // Midnight today
+        // Auto-Check Overdue Status using date strings to avoid timezone issues
+        const todayStr = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
         let hasUpdates = false;
 
         db.data.invoices.forEach((inv: any) => {
             if (inv.status === 'issued' && inv.dueDate) {
-                const dueDate = new Date(inv.dueDate);
-                // Ensure we compare apples to apples (dates at midnight)
-                dueDate.setHours(0, 0, 0, 0);
+                // Extract date portion only (handles both ISO strings and YYYY-MM-DD)
+                const dueDateStr = String(inv.dueDate).split('T')[0];
 
                 // Debug Log
-                console.log(`[Check Overdue] Inv: ${inv.number}, Status: ${inv.status}, Due: ${inv.dueDate} (Parsed: ${dueDate.toISOString()}), Now: ${now.toISOString()}`);
+                console.log(`[Check Overdue] Inv: ${inv.number}, Status: ${inv.status}, Due: ${dueDateStr}, Today: ${todayStr}`);
 
-                // Overdue if today is strictly after the due date
-                if (now.getTime() > dueDate.getTime()) {
+                // Overdue if today is strictly after the due date (string comparison works for YYYY-MM-DD format)
+                if (todayStr > dueDateStr) {
                     console.log(`[Auto-Overdue] !!! Marking invoice ${inv.number} as OVERDUE !!!`);
                     inv.status = 'overdue';
                     inv.updatedAt = new Date().toISOString();
@@ -188,6 +226,17 @@ ipcMain.handle('invoice:delete', async (_, id: string) => {
             return { success: true };
         }
         return { success: false, error: 'Invoice not found' };
+    } catch (e: any) {
+        return { success: false, error: e.message };
+    }
+});
+
+// Get Next Invoice Number (Predicted)
+ipcMain.handle('invoice:nextNumber', async () => {
+    try {
+        const db = await getDB();
+        const last = typeof db.data.lastInvoiceNumber === 'number' ? db.data.lastInvoiceNumber : 613;
+        return { success: true, nextNumber: last + 1 };
     } catch (e: any) {
         return { success: false, error: e.message };
     }
@@ -300,11 +349,18 @@ ipcMain.handle('app:restore', async () => {
 
         const filePath = result.filePaths[0];
         const fileContent = fs.readFileSync(filePath, 'utf-8');
-        const data = JSON.parse(fileContent);
+
+        // Parse JSON with explicit error handling
+        let data;
+        try {
+            data = JSON.parse(fileContent);
+        } catch (parseError) {
+            return { success: false, error: 'Invalid JSON in backup file. The file may be corrupted.' };
+        }
 
         // Basic validation
         if (!Array.isArray(data.customers) || !Array.isArray(data.invoices)) {
-            return { success: false, error: 'Invalid backup file format' };
+            return { success: false, error: 'Invalid backup file format: missing customers or invoices array' };
         }
 
         const db = await getDB();
@@ -797,17 +853,151 @@ ipcMain.handle('dialog:saveFile', async (_, defaultPath) => {
     return result;
 });
 
+
+
 // Read Headers from Excel
 ipcMain.handle('excel:readHeaders', async (_, filePath) => {
     try {
-        const workbook = XLSX.readFile(filePath);
-        const sheetName = workbook.SheetNames[0];
-        const sheet = workbook.Sheets[sheetName];
-        // Read first row specifically
-        const headers = XLSX.utils.sheet_to_json(sheet, { header: 1 })[0] as string[];
+        const fileBuffer = fs.readFileSync(filePath);
+        const workbook = XLSX.read(fileBuffer, { type: 'buffer' });
+        const firstSheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[firstSheetName];
+
+        // Get range
+        const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1');
+        const headers: { name: string, index: number }[] = [];
+
+        for (let C = range.s.c; C <= range.e.c; ++C) {
+            const cellAddress = XLSX.utils.encode_cell({ r: range.s.r, c: C });
+            const cell = worksheet[cellAddress];
+            if (cell && cell.v) {
+                headers.push({ name: String(cell.v), index: C });
+            }
+        }
         return { success: true, headers };
-    } catch (error: any) {
-        return { success: false, error: error.message };
+    } catch (e: any) {
+        return { success: false, error: e.message };
+    }
+});
+
+// Read Column Data
+ipcMain.handle('excel:readColumn', async (_, filePath, colIndex) => {
+    try {
+        const fileBuffer = fs.readFileSync(filePath);
+        const workbook = XLSX.read(fileBuffer, { type: 'buffer' });
+        const firstSheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[firstSheetName];
+
+        const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+        const columnData = jsonData.map((row: any) => row[colIndex]);
+
+        return { success: true, data: columnData };
+    } catch (e: any) {
+        return { success: false, error: e.message };
+    }
+});
+
+// Generate Executive Summary
+ipcMain.handle('reports:executive-summary', async (_, { data, filename }) => {
+    try {
+        // 1. Prepare Data for Sheet
+        // Expected data structure: matches user request columns
+        // Serial, Customer, Total QTY, 10mm Qty, 20mm Qty, 10mm %, 20mm %, 10mm Trips, 20mm Trips, Total Trips, Invoice No, Excess 10mm
+
+        // Calculate Grand Totals
+        const total = {
+            totalQty: 0,
+            qty10: 0,
+            qty20: 0,
+            trips10: 0,
+            trips20: 0,
+            tripsTotal: 0,
+            excess: 0
+        };
+
+        const rows = data.map((item: any, idx: number) => {
+            total.totalQty += item.totalQty || 0;
+            total.qty10 += item.qty10 || 0;
+            total.qty20 += item.qty20 || 0;
+            total.trips10 += item.trips10 || 0;
+            total.trips20 += item.trips20 || 0;
+            total.tripsTotal += item.tripsTotal || 0;
+            total.excess += item.excess || 0;
+
+            return {
+                'Serial': idx + 1,
+                'Customer': item.customer,
+                'Total QTY (MT)': item.totalQty,
+                '10 mm Qty (MT)': item.qty10,
+                '20 mm Qty (MT)': item.qty20,
+                '10 mm %': item.pct10 ? `${item.pct10.toFixed(1)}%` : '0%',
+                '20 mm %': item.pct20 ? `${item.pct20.toFixed(1)}%` : '0%',
+                '10 mm Trips': item.trips10,
+                '20 mm Trips': item.trips20,
+                'Total 10 & 20 Trips': item.tripsTotal,
+                'Invoice No': item.invoiceNo,
+                'Excess 10mm (60:40)': item.excess
+            };
+        });
+
+        // Add Grand Total Row
+        rows.push({
+            'Serial': '',
+            'Customer': 'GRAND TOTAL',
+            'Total QTY (MT)': total.totalQty,
+            '10 mm Qty (MT)': total.qty10,
+            '20 mm Qty (MT)': total.qty20,
+            '10 mm %': total.totalQty > 0 ? `${((total.qty10 / total.totalQty) * 100).toFixed(1)}%` : '',
+            '20 mm %': total.totalQty > 0 ? `${((total.qty20 / total.totalQty) * 100).toFixed(1)}%` : '',
+            '10 mm Trips': total.trips10,
+            '20 mm Trips': total.trips20,
+            'Total 10 & 20 Trips': total.tripsTotal,
+            'Invoice No': '',
+            'Excess 10mm (60:40)': total.excess
+        });
+
+        // 2. Create Workbook
+        const worksheet = XLSX.utils.json_to_sheet(rows);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Executive Summary");
+
+        // Adjust Column Widths (Simple heuristic)
+        const wscols = [
+            { wch: 6 },  // Serial
+            { wch: 30 }, // Customer
+            { wch: 15 }, // Total Qty
+            { wch: 15 }, // 10mm
+            { wch: 15 }, // 20mm
+            { wch: 10 }, // 10%
+            { wch: 10 }, // 20%
+            { wch: 12 }, // 10 Trips
+            { wch: 12 }, // 20 Trips
+            { wch: 15 }, // Total Trips
+            { wch: 15 }, // Invoice
+            { wch: 20 }, // Excess
+        ];
+        worksheet['!cols'] = wscols;
+
+        // 3. Save Output
+        const wbBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'buffer' });
+
+        const { filePath } = await dialog.showSaveDialog({
+            title: 'Save Executive Summary',
+            defaultPath: filename || `Executive-Summary-${new Date().toISOString().split('T')[0]}.xlsx`,
+            filters: [{ name: 'Excel Files', extensions: ['xlsx'] }]
+        });
+
+        if (filePath) {
+            fs.writeFileSync(filePath, wbBuffer);
+            // Open the file/folder?
+            shell.showItemInFolder(filePath);
+            return { success: true };
+        }
+        return { success: false, error: 'Cancelled' };
+
+    } catch (e: any) {
+        console.error("Export Error:", e);
+        return { success: false, error: e.message };
     }
 });
 
