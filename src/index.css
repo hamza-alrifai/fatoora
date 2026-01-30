@@ -2,106 +2,110 @@
 @import "tailwindcss";
 
 /* 
-  COSMIC GLASS THEME 
-  Palette: Deep Space (Backgrounds), Nebula (Accents), Starlight (Text)
+  NATURE GLASS THEME 
+  Palette: Emerald (Primary), Teal (Accents), Sage (Neutrals)
 */
 
 @theme {
     /* Base Colors */
     --color-background: #ffffff;
-    --color-foreground: #030712;
-    /* gray-950 */
+    --color-foreground: #022c22;
+    /* emerald-950 */
 
     /* Cards & Surfaces */
     --color-card: #ffffff;
-    --color-card-foreground: #030712;
+    --color-card-foreground: #022c22;
     --color-popover: #ffffff;
-    --color-popover-foreground: #030712;
+    --color-popover-foreground: #022c22;
 
     /* Brand Colors */
-    --color-primary: #6366f1;
-    /* Indigo-500 */
+    --color-primary: #10b981;
+    /* emerald-500 */
     --color-primary-foreground: #ffffff;
-    --color-secondary: #f3f4f6;
-    /* gray-100 */
-    --color-secondary-foreground: #111827;
-    /* gray-900 */
+    --color-secondary: #f0fdf4;
+    /* emerald-50 */
+    --color-secondary-foreground: #166534;
+    /* emerald-800 */
 
     /* UI States */
-    --color-muted: #f3f4f6;
-    --color-muted-foreground: #6b7280;
-    /* gray-500 */
-    --color-accent: #f3f4f6;
-    --color-accent-foreground: #111827;
+    --color-muted: #f0fdf4;
+    /* emerald-50 */
+    --color-muted-foreground: #64748b;
+    /* slate-500 */
+
+    --color-accent: #f0fdf4;
+    /* emerald-50 */
+    --color-accent-foreground: #166534;
+    /* emerald-800 */
+
     --color-destructive: #ef4444;
     --color-destructive-foreground: #ffffff;
 
     /* Borders & Inputs */
-    --color-border: #e5e7eb;
-    --color-input: #e5e7eb;
-    --color-ring: #6366f1;
+    --color-border: #e2e8f0;
+    --color-input: #e2e8f0;
+    --color-ring: #10b981;
 
     /* Semantic */
     --color-success: #10b981;
-    /* emerald-500 */
     --color-warning: #f59e0b;
-    /* amber-500 */
-    --color-info: #3b82f6;
-    /* blue-500 */
+    --color-info: #0ea5e9;
 
     /* Radii */
     --radius-sm: 0.5rem;
     --radius-md: 0.75rem;
     --radius-lg: 1rem;
-    /* Glass Backgrounds - Theme Aware */
-    --color-glass-background: rgba(255, 255, 255, 0.7);
-    --color-glass-border: rgba(0, 0, 0, 0.1);
+
+    /* Glass Backgrounds */
+    --color-glass-background: rgba(255, 255, 255, 0.8);
+    --color-glass-border: rgba(16, 185, 129, 0.1);
 }
 
-/* Dark theme - The "Cosmic" Part */
+/* Dark theme - "Deep Forest" */
 .dark {
-    /* ... existing dark variables ... */
-    --color-glass-background: rgba(15, 23, 42, 0.6);
-    --color-glass-border: rgba(255, 255, 255, 0.08);
+    /* Glass Backgrounds */
+    --color-glass-background: rgba(2, 44, 34, 0.7);
+    /* emerald-950/70 */
+    --color-glass-border: rgba(52, 211, 153, 0.1);
+    /* emerald-400/10 */
 
-    /* Deep Space Background */
-    --color-background: #050510;
-    /* Very dark indigo/black */
-    --color-foreground: #f8fafc;
-    /* slate-50 */
+    /* Background */
+    --color-background: #020617;
+    /* slate-950 */
+    --color-foreground: #f0fdf4;
+    /* emerald-50 */
 
-    /* Glass Cards */
-    --color-card: rgba(15, 23, 42, 0.6);
-    /* slate-900 with opacity */
-    --color-card-foreground: #f8fafc;
-    --color-popover: #0f172a;
-    --color-popover-foreground: #f8fafc;
+    /* Cards */
+    --color-card: rgba(2, 44, 34, 0.4);
+    --color-card-foreground: #f0fdf4;
+    --color-popover: #020617;
+    --color-popover-foreground: #f0fdf4;
 
-    /* Vibrant Accents */
-    --color-primary: #818cf8;
-    /* indigo-400 */
-    --color-primary-foreground: #ffffff;
-    --color-secondary: rgba(30, 41, 59, 0.5);
-    /* slate-800 glass */
-    --color-secondary-foreground: #f8fafc;
+    /* Brand */
+    --color-primary: #34d399;
+    /* emerald-400 */
+    --color-primary-foreground: #022c22;
+    --color-secondary: rgba(6, 78, 59, 0.5);
+    /* emerald-900/50 */
+    --color-secondary-foreground: #d1fae5;
+    /* emerald-100 */
 
     /* Muted */
-    --color-muted: rgba(30, 41, 59, 0.5);
+    --color-muted: rgba(6, 78, 59, 0.5);
     --color-muted-foreground: #94a3b8;
     /* slate-400 */
 
     /* Interactions */
-    --color-accent: rgba(99, 102, 241, 0.15);
-    /* indigo glass */
+    --color-accent: rgba(52, 211, 153, 0.1);
     --color-accent-foreground: #ffffff;
 
     --color-destructive: #ef4444;
     --color-destructive-foreground: #ffffff;
 
     /* Borders */
-    --color-border: rgba(255, 255, 255, 0.08);
-    --color-input: rgba(255, 255, 255, 0.08);
-    --color-ring: #818cf8;
+    --color-border: rgba(52, 211, 153, 0.1);
+    --color-input: rgba(52, 211, 153, 0.1);
+    --color-ring: #34d399;
 }
 
 * {
@@ -119,25 +123,32 @@ body {
     padding: 0;
     overflow: hidden;
 
-    /* Cosmic Background Gradient for Dark Mode */
+    /* Nature Gradient for Background */
     background-image:
-        radial-gradient(circle at 15% 50%, rgba(99, 102, 241, 0.08), transparent 25%),
-        radial-gradient(circle at 85% 30%, rgba(139, 92, 246, 0.08), transparent 25%);
+        radial-gradient(circle at 10% 20%, rgba(16, 185, 129, 0.05), transparent 40%),
+        radial-gradient(circle at 90% 80%, rgba(14, 165, 233, 0.05), transparent 40%);
+}
+
+.dark body {
+    background-image:
+        radial-gradient(circle at 15% 50%, rgba(16, 185, 129, 0.08), transparent 30%),
+        radial-gradient(circle at 85% 30%, rgba(5, 150, 105, 0.08), transparent 30%);
 }
 
 /* Glass Utilities */
 .glass {
     background: var(--color-glass-background);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
     border: 1px solid var(--color-glass-border);
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
 }
 
 .glass-panel {
-    background: rgba(30, 41, 59, 0.3);
+    background: var(--color-card);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
-    border: 1px solid rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--color-border);
 }
 
 /* Scrollbar */
@@ -151,7 +162,7 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-    background: rgba(148, 163, 184, 0.2);
+    background: rgba(148, 163, 184, 0.5);
     border-radius: 99px;
 }
 

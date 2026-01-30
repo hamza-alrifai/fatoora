@@ -4,6 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loader2, Receipt, Search, ArrowLeft, Calendar, DollarSign, Briefcase } from 'lucide-react';
 import { toast } from 'sonner';
+import { GlassAlertDialog } from '@/components/ui/glass-alert-dialog';
 import type { Invoice } from '@/types';
 import { InvoiceEditor } from './InvoiceEditor';
 import { format } from 'date-fns';
@@ -17,10 +18,15 @@ import {
 } from "@/components/ui/table";
 
 
-export function InvoiceWorkspace() {
+interface InvoiceWorkspaceProps {
+    onNavigate?: (module: string) => void;
+}
+
+export function InvoiceWorkspace({ onNavigate }: InvoiceWorkspaceProps) {
     const [invoices, setInvoices] = useState<Invoice[]>([]);
     const [isEditorOpen, setIsEditorOpen] = useState(false);
     const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
+    const [invoiceToDelete, setInvoiceToDelete] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
 
@@ -62,19 +68,24 @@ export function InvoiceWorkspace() {
     };
 
     const handleDelete = async (id: string) => {
-        if (confirm('Are you sure you want to delete this invoice?')) {
-            const result = await window.electron.deleteInvoice(id);
-            if (result.success) {
-                toast.success('Invoice deleted');
-                loadInvoices();
-                if (selectedInvoice?.id === id) {
-                    setIsEditorOpen(false);
-                    setSelectedInvoice(null);
-                }
-            } else {
-                toast.error(result.error);
+        setInvoiceToDelete(id);
+    };
+
+    const confirmDelete = async () => {
+        if (!invoiceToDelete) return;
+
+        const result = await window.electron.deleteInvoice(invoiceToDelete);
+        if (result.success) {
+            toast.success('Invoice deleted');
+            loadInvoices();
+            if (selectedInvoice?.id === invoiceToDelete) {
+                setIsEditorOpen(false);
+                setSelectedInvoice(null);
             }
+        } else {
+            toast.error(result.error);
         }
+        setInvoiceToDelete(null);
     };
 
 
@@ -178,9 +189,25 @@ export function InvoiceWorkspace() {
                     {isLoading ? (
                         <div className="flex justify-center items-center h-40"><Loader2 className="animate-spin h-8 w-8 text-primary" /></div>
                     ) : filteredInvoices.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
-                            <Receipt className="w-12 h-12 mb-4 opacity-20" />
-                            <p>No invoices found</p>
+                        <div className="flex flex-col items-center justify-center h-64 text-muted-foreground space-y-4">
+                            <div className="p-4 bg-secondary/30 rounded-full">
+                                <Receipt className="w-12 h-12 opacity-20" />
+                            </div>
+                            <div className="text-center">
+                                <h3 className="font-medium text-foreground text-lg">No invoices found</h3>
+                                <p className="text-sm text-muted-foreground mt-1 max-w-xs mx-auto">
+                                    Use the Matcher to process your Excel files and generate invoices automatically.
+                                </p>
+                            </div>
+                            {onNavigate && (
+                                <Button
+                                    onClick={() => onNavigate('matcher')}
+                                    variant="outline"
+                                    className="border-primary/20 text-primary hover:bg-primary/10 hover:text-primary hover:border-primary/50"
+                                >
+                                    Go to Matcher
+                                </Button>
+                            )}
                         </div>
                     ) : (
                         <Table>
@@ -234,6 +261,16 @@ export function InvoiceWorkspace() {
                     )}
                 </div>
             </Card>
+
+            <GlassAlertDialog
+                isOpen={!!invoiceToDelete}
+                onClose={() => setInvoiceToDelete(null)}
+                onConfirm={confirmDelete}
+                title="Delete Invoice"
+                description="Are you sure you want to delete this invoice? This action cannot be undone."
+                confirmText="Delete"
+                variant="danger"
+            />
         </div>
     );
 }

@@ -132,7 +132,7 @@ export function SettingsWorkspace() {
 
                 <div className="grid gap-6">
                     {/* Banking Details */}
-                    <Card className="p-6">
+                    <Card className="p-6 bg-card/40 backdrop-blur-md border-white/5 shadow-sm hover:shadow-md transition-all">
                         <div className="mb-6 flex items-center gap-2 border-b pb-4">
                             <Building2 className="h-5 w-5 text-primary" />
                             <h3 className="font-semibold">Banking Details</h3>
@@ -203,7 +203,7 @@ export function SettingsWorkspace() {
                     </Card>
 
                     {/* Data Management */}
-                    <Card className="p-6">
+                    <Card className="p-6 bg-card/40 backdrop-blur-md border-white/5 shadow-sm hover:shadow-md transition-all">
                         <div className="mb-6 flex items-center gap-2 border-b pb-4">
                             <Database className="h-5 w-5 text-primary" />
                             <h3 className="font-semibold">Data Management</h3>
@@ -226,7 +226,7 @@ export function SettingsWorkspace() {
                     </Card>
 
                     {/* Danger Zone */}
-                    <Card className="p-6 border-destructive/50 bg-destructive/5">
+                    <Card className="p-6 border-destructive/30 bg-destructive/5 backdrop-blur-md">
                         <div className="mb-6 flex items-center gap-2 border-b border-destructive/20 pb-4">
                             <AlertTriangle className="h-5 w-5 text-destructive" />
                             <h3 className="font-semibold text-destructive">Danger Zone</h3>

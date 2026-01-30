@@ -6,7 +6,7 @@ interface GlassDialogProps {
     isOpen: boolean;
     onClose: () => void;
     title: string;
-    description?: string;
+    description?: React.ReactNode;
     children: React.ReactNode;
     className?: string;
 }
@@ -58,9 +58,9 @@ export function GlassDialog({
                 </div>
 
                 {description && (
-                    <p className="text-sm text-muted-foreground mb-6">
+                    <div className="text-sm text-muted-foreground mb-6">
                         {description}
-                    </p>
+                    </div>
                 )}
 
                 <div>

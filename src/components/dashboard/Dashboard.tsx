@@ -155,8 +155,16 @@ export function Dashboard() {
                                     </TableRow>
                                 ) : recentInvoices.length === 0 ? (
                                     <TableRow>
-                                        <TableCell colSpan={5} className="text-center h-24 text-muted-foreground">
-                                            No recent invoices.
+                                        <TableCell colSpan={5} className="h-48">
+                                            <div className="flex flex-col items-center justify-center h-full text-center space-y-3">
+                                                <div className="p-4 bg-secondary/50 rounded-full">
+                                                    <Receipt className="w-8 h-8 text-muted-foreground/50" />
+                                                </div>
+                                                <div>
+                                                    <div className="text-sm font-medium text-foreground">No invoices generated yet</div>
+                                                    <div className="text-xs text-muted-foreground mt-1">Create your first invoice to see it here.</div>
+                                                </div>
+                                            </div>
                                         </TableCell>
                                     </TableRow>
                                 ) : (
@@ -240,8 +248,12 @@ export function Dashboard() {
 
                             if (agingInvoices.length === 0) {
                                 return (
-                                    <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground space-y-2">
-                                        <p className="text-sm">No overdue invoices found.</p>
+                                    <div className="flex flex-col items-center justify-center h-full text-center space-y-2">
+                                        <div className="p-3 bg-emerald-500/10 rounded-full">
+                                            <AlertCircle className="w-6 h-6 text-emerald-500" />
+                                        </div>
+                                        <div className="text-sm font-medium text-emerald-500">All caught up!</div>
+                                        <div className="text-xs text-muted-foreground">No overdue invoices found.</div>
                                     </div>
                                 );
                             }

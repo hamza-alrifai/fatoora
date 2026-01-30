@@ -20,6 +20,7 @@ export interface FileAnalysis {
     };
     suggestedRowRange?: { start: number; end: number };
     suggestedMatchLabel?: string;
+    preview?: any[][];
     error?: string;
 }
 

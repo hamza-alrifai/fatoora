@@ -2,38 +2,18 @@ import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import type { FileAnalysis, Customer } from '../../types.d';
 import { GlassDialog } from '@/components/ui/glass-dialog';
-import {
-    FileSpreadsheet,
-    FolderOpen,
-    Check,
-    RefreshCw,
-    Loader2,
-    Sparkles,
-    ChevronDown,
-    ChevronUp,
-    AlertCircle,
-    Files,
-    Zap,
-    Settings2,
-    Download,
-    Eye,
-    ExternalLink,
-    Receipt,
-    Plus,
-    Trash2,
-    FileText,
-    TrendingUp,
-    DollarSign
-} from 'lucide-react';
-import * as XLSX from 'xlsx';
-import { generateExecutiveSummary, type CustomerSummary } from '@/utils/matcher-utils';
+import { ArrowRight, Check, FileSpreadsheet, Files, Loader2, RefreshCw, Sparkles, Trash2, AlertCircle, ExternalLink } from 'lucide-react';
+
+import * as ExcelJS from 'exceljs';
+import { type CustomerSummary } from '@/utils/matcher-utils';
+import { ColumnMapper } from './ColumnMapper';
+import { InvoiceGenerationDialog } from './InvoiceGenerationDialog';
+import { Badge } from '@/components/ui/badge';
 
 interface FileConfig extends FileAnalysis {
     matchLabel?: string;
@@ -46,19 +26,25 @@ interface MatcherWorkspaceProps {
     onStepChange: (step: 'configure' | 'done') => void;
 }
 
+const STORAGE_KEY = 'fatoora_matcher_state';
+
 export function MatcherWorkspace({ currentStep, onStepChange }: MatcherWorkspaceProps) {
     // Local state for DATA, but step is now controlled
     const [masterConfig, setMasterConfig] = useState<FileConfig | null>(null);
     const [targetConfigs, setTargetConfigs] = useState<FileConfig[]>([]);
+
+    // UX State
+    const [mapperOpen, setMapperOpen] = useState(false);
+    const [mappingTarget, setMappingTarget] = useState<{ type: 'master' | 'target', index: number } | null>(null);
+
+    const [outputFilePath, setOutputFilePath] = useState<string | null>(null);
     const [noMatchLabel, setNoMatchLabel] = useState('Not Matched');
-    const [showAdvanced, setShowAdvanced] = useState(false);
     const [isProcessing, setIsProcessing] = useState(false);
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [unmatchedPath, setUnmatchedPath] = useState<string | null>(null);
-    const [unmatchedPreview, setUnmatchedPreview] = useState<any[][] | null>(null);
-    const [showUnmatchedPreview, setShowUnmatchedPreview] = useState(false);
     const [_matchedRows, setMatchedRows] = useState<Array<{ sourceFile: string; data: any[]; rowNumber: number; }>>([]); // eslint-disable-line @typescript-eslint/no-unused-vars;
     const [isGeneratingInvoices, setIsGeneratingInvoices] = useState(false);
+    const [isHydrated, setIsHydrated] = useState(false);
 
     // Customer Selection State
     const [customers, setCustomers] = useState<Customer[]>([]);
@@ -69,13 +55,26 @@ export function MatcherWorkspace({ currentStep, onStepChange }: MatcherWorkspace
         customerId: string | null;
         rate10: number;
         rate20: number;
+        rateExcess10: number;
+        splitRates10?: {
+            enabled: boolean;
+            threshold: number;
+            rate1: number;
+            rate2: number;
+        };
+        splitRates20?: {
+            enabled: boolean;
+            threshold: number;
+            rate1: number;
+            rate2: number;
+        };
         descriptionColIdx: number;
         quantityColIdx: number;
         resultColIdx?: number;
     };
     const [fileGenConfigs, setFileGenConfigs] = useState<Record<string, FileGenConfig>>({});
 
-    const [isLoadingCustomers, setIsLoadingCustomers] = useState(false);
+
     const [isCreatingCustomer, setIsCreatingCustomer] = useState(false);
     // Track which file we are creation a customer FOR (index in targetConfigs)
     const [creatingCustomerForTargetIndex, setCreatingCustomerForTargetIndex] = useState<number | null>(null);
@@ -93,6 +92,12 @@ export function MatcherWorkspace({ currentStep, onStepChange }: MatcherWorkspace
         unmatchedMasterRows: number;
         matchPercentage: number;
     } | null>(null);
+
+    // Calculated Totals for Groups
+    const [groupTotals, setGroupTotals] = useState<Record<string, { total: number, t10: number, t20: number }>>({});
+    // Projections for UI (Customer based)
+    const [customerProjections, setCustomerProjections] = useState<Record<string, { t10: number, t20: number }>>({});
+
     const [perFileStats, setPerFileStats] = useState<Array<{
         fileName: string;
         filePath: string;
@@ -106,62 +111,268 @@ export function MatcherWorkspace({ currentStep, onStepChange }: MatcherWorkspace
     const [outputFileHeaders, setOutputFileHeaders] = useState<{ name: string; index: number }[]>([]);
 
     // Executive Summary State
-    const [showSummaryDialog, setShowSummaryDialog] = useState(false);
-    const [summaryColumnIndex, setSummaryColumnIndex] = useState<number>(-1);
-    const [summaryRate10, setSummaryRate10] = useState<string>('25');
-    const [summaryRate20, setSummaryRate20] = useState<string>('30');
+    // Executive Summary State
+
+
+    // Derived config for summary (shared with Invoice Generation Global Settings)
+    const summaryConfig = fileGenConfigs['output'] || {
+        customerId: null,
+        rate10: 25,
+        rate20: 30,
+        rateExcess10: 0,
+        descriptionColIdx: -1,
+        quantityColIdx: -1,
+        resultColIdx: -1
+    };
+
+
+
     const [executiveSummary, setExecutiveSummary] = useState<CustomerSummary[] | null>(null);
 
     const handleGenerateSummary = () => {
-        if (summaryColumnIndex === -1) {
+        if (!summaryConfig.resultColIdx || summaryConfig.resultColIdx === -1) {
             toast.error("Please select a customer column");
             return;
         }
 
         const guessed = guessColumns(outputFileHeaders.map(h => h.name));
-        // Use guessed columns or defaults if not found
-        const descCol = guessed.descriptionColIdx;
-        const qtyCol = guessed.quantityColIdx;
+        const descCol = summaryConfig.descriptionColIdx !== -1 ? summaryConfig.descriptionColIdx : guessed.descriptionColIdx;
+        const qtyCol = summaryConfig.quantityColIdx !== -1 ? summaryConfig.quantityColIdx : guessed.quantityColIdx;
 
         try {
-            const summary = generateExecutiveSummary(
-                outputFileData,
-                summaryColumnIndex,
-                qtyCol,
-                descCol,
-                parseFloat(summaryRate10 || '0'),
-                parseFloat(summaryRate20 || '0')
-            );
-            setExecutiveSummary(summary);
-            setShowSummaryDialog(false);
-            toast.success("Executive Summary Generated!");
-        } catch (e) {
-            console.error(e);
+            // Aggregate Data by Customer Group
+            const groups: Record<string, { items: any[], trips10: number, trips20: number }> = {};
+            const dataRows = outputFileData.slice(1);
+
+            // Inline helper for split (copied to ensure consistency)
+            const processSplit = (currentItems: any[], splitConfig: any, itemType: string) => {
+                if (!splitConfig || !splitConfig.enabled) return currentItems;
+                const threshold = splitConfig.threshold || 0;
+                const r1 = splitConfig.rate1 || 0;
+                const r2 = splitConfig.rate2 || 0;
+                let newItems: any[] = [];
+                currentItems.forEach(item => {
+                    if (item.type !== itemType) {
+                        newItems.push(item);
+                        return;
+                    }
+                    if (item.quantity <= threshold) {
+                        item.unitPrice = r1;
+                        item.amount = Math.round(item.quantity * r1 * 100) / 100;
+                        newItems.push(item);
+                    } else {
+                        // Split
+                        const q1 = threshold;
+                        const q2 = item.quantity - threshold;
+                        const i1 = { ...item, quantity: q1, unitPrice: r1, amount: Math.round(q1 * r1 * 100) / 100, id: crypto.randomUUID() };
+                        const i2 = {
+                            ...item,
+                            quantity: q2,
+                            unitPrice: r2,
+                            amount: Math.round(q2 * r2 * 100) / 100,
+                            id: crypto.randomUUID(),
+                            description: `${item.description} (> ${threshold})`
+                        };
+                        newItems.push(i1);
+                        newItems.push(i2);
+                    }
+                });
+                return newItems;
+            };
+
+            dataRows.forEach((row) => {
+                const groupName = String(row[summaryConfig.resultColIdx!] || '').trim();
+
+                if (!groupName || groupName.toLowerCase() === 'not matched' || groupName === noMatchLabel) return;
+
+                // Get Config
+                const groupConfig = fileGenConfigs[groupName];
+                if (!groups[groupName]) groups[groupName] = { items: [], trips10: 0, trips20: 0 };
+
+                // Parse Qty
+                let qty = 0;
+                if (qtyCol !== -1 && qtyCol < row.length) {
+                    const raw = row[qtyCol];
+                    if (typeof raw === 'number') qty = raw;
+                    else if (typeof raw === 'string') qty = parseFloat(raw.replace(/[^0-9.]/g, '')) || 0;
+                }
+
+                // Determine Type
+                const desc = String(row[descCol] || '').toLowerCase();
+                const fullRow = row.join(' ').toLowerCase();
+                let type: '10mm' | '20mm' = '10mm';
+                if (desc.includes('20mm') || fullRow.includes('20mm')) type = '20mm';
+                else if (desc.includes('10mm') || fullRow.includes('10mm')) type = '10mm';
+                else {
+                    if (desc.includes('10mm')) type = '10mm';
+                    else if (desc.includes('20mm')) type = '20mm';
+                    else type = '10mm'; // Fallback
+                }
+
+                // Count Trips (Rows)
+                if (type === '10mm') groups[groupName].trips10++;
+                else groups[groupName].trips20++;
+
+                // Rate
+                let rate = 0;
+                if (groupConfig) {
+                    rate = type === '10mm' ? groupConfig.rate10 : groupConfig.rate20;
+                } else {
+                    rate = type === '10mm' ? (summaryConfig.rate10 || 25) : (summaryConfig.rate20 || 30);
+                }
+
+                groups[groupName].items.push({
+                    type,
+                    quantity: qty,
+                    unitPrice: rate,
+                    amount: Math.round(qty * rate * 100) / 100,
+                    description: row[descCol]
+                });
+            });
+
+            // Calculate Totals per Group
+            const summaryRows: CustomerSummary[] = Object.entries(groups).map(([name, data]) => {
+                let items = data.items;
+                const config = fileGenConfigs[name];
+
+                // Apply Splits
+                if (config) {
+                    items = processSplit(items, config.splitRates10, '10mm');
+                    items = processSplit(items, config.splitRates20, '20mm');
+                }
+
+                // Apply Excess
+                let excessAmount = 0;
+                const t10Qty = items.filter(i => i.type === '10mm').reduce((s, i) => s + i.quantity, 0);
+                const t20Qty = items.filter(i => i.type === '20mm').reduce((s, i) => s + i.quantity, 0);
+                const totalQ = t10Qty + t20Qty;
+
+                let hist10 = 0;
+                let hist20 = 0;
+                if (config?.customerId) {
+                    const c = customers.find(cust => cust.id === config.customerId);
+                    if (c) {
+                        hist10 = c.total10mm || 0;
+                        hist20 = c.total20mm || 0;
+                    }
+                }
+
+                const excessRate = config ? config.rateExcess10 : 0;
+                if (excessRate > 0) {
+                    const cum10 = hist10 + t10Qty;
+                    const cum20 = hist20 + t20Qty;
+                    const cumGrand = cum10 + cum20;
+                    const cumAllowed10 = cumGrand * 0.40;
+                    const cumExcess = Math.max(0, cum10 - cumAllowed10);
+                    const histExcess = Math.max(0, hist10 - (hist10 + hist20) * 0.40);
+                    const excessQty = Math.max(0, cumExcess - histExcess);
+
+                    if (excessQty > 0) {
+                        excessAmount = excessQty * excessRate;
+                        let remaining = excessQty;
+                        items.filter(i => i.type === '10mm').forEach(item => {
+                            if (remaining <= 0) return;
+                            const deduct = Math.min(item.quantity, remaining);
+                            item.quantity -= deduct;
+                            item.amount = Math.round(item.quantity * item.unitPrice * 100) / 100;
+                            remaining -= deduct;
+                        });
+                        items.push({
+                            type: '10mm',
+                            quantity: excessQty,
+                            unitPrice: excessRate,
+                            amount: Math.round(excessQty * excessRate * 100) / 100,
+                            description: 'Excess'
+                        });
+                    }
+                }
+
+                const amount10 = items.filter(i => i.type === '10mm').reduce((s, i) => s + i.amount, 0);
+                const amount20 = items.filter(i => i.type === '20mm').reduce((s, i) => s + i.amount, 0);
+                const totalVal = amount10 + amount20;
+
+                return {
+                    name,
+                    total20mm: Math.round(t20Qty * 100) / 100,
+                    total10mm: Math.round(t10Qty * 100) / 100,
+                    totalOther: 0,
+                    totalQty: Math.round(totalQ * 100) / 100,
+                    amount20mm: Math.round(amount20 * 100) / 100,
+                    amount10mm: Math.round(amount10 * 100) / 100,
+                    ticketCount: data.trips10 + data.trips20,
+                    totalAmount: Math.round(totalVal * 100) / 100,
+                    trips10mm: data.trips10,
+                    trips20mm: data.trips20,
+                    percentage10mm: totalQ > 0 ? Math.round((t10Qty / totalQ) * 1000) / 10 : 0,
+                    percentage20mm: totalQ > 0 ? Math.round((t20Qty / totalQ) * 1000) / 10 : 0,
+                    excess10mm: Math.round(excessAmount * 100) / 100,
+                    invoiceNo: 'DRAFT'
+                };
+            });
+
+            setExecutiveSummary(summaryRows);
+            toast.success("Executive Summary Generated");
+        } catch (error) {
+            console.error(error);
             toast.error("Failed to generate summary");
         }
     };
 
-    const handleExportSummary = () => {
+    const handleExportSummary = async () => {
         if (!executiveSummary) return;
 
-        // Prepare data for export
-        const exportData = executiveSummary.map((s, idx) => ({
-            'Serial': (idx + 1).toString(),
-            'Customer': s.name,
-            'Total Qty (MT)': s.totalQty,
-            '10mm Qty (MT)': s.total10mm,
-            '20mm Qty (MT)': s.total20mm,
-            '10mm %': s.percentage10mm + '%',
-            '20mm %': s.percentage20mm + '%',
-            '10mm Trips': s.trips10mm,
-            '20mm Trips': s.trips20mm,
-            'Total Trips': s.trips10mm + s.trips20mm,
-            'Invoice No': s.invoiceNo,
-            'Excess 10mm': s.excess10mm,
-            'Total Value': s.totalAmount
-        }));
+        // Create workbook and worksheet
+        const workbook = new ExcelJS.Workbook();
+        const worksheet = workbook.addWorksheet('Executive Summary');
 
-        // Add Grand Total row
+        // Define columns
+        worksheet.columns = [
+            { header: 'Serial', key: 'serial', width: 8 },
+            { header: 'Customer', key: 'customer', width: 30 },
+            { header: 'Total Qty (MT)', key: 'totalQty', width: 15, style: { numFmt: '#,##0.00' } },
+            { header: '10mm Qty (MT)', key: 'total10mm', width: 15, style: { numFmt: '#,##0.00' } },
+            { header: '20mm Qty (MT)', key: 'total20mm', width: 15, style: { numFmt: '#,##0.00' } },
+            { header: '10mm %', key: 'pct10mm', width: 10 },
+            { header: '20mm %', key: 'pct20mm', width: 10 },
+            { header: '10mm Trips', key: 'trips10mm', width: 12 },
+            { header: '20mm Trips', key: 'trips20mm', width: 12 },
+            { header: 'Total Trips', key: 'totalTrips', width: 12 },
+            { header: 'Invoice No', key: 'invNo', width: 15 },
+            { header: 'Excess 10mm', key: 'excess10mm', width: 15, style: { numFmt: '#,##0.00' } },
+            { header: 'Total Value', key: 'totalValue', width: 18, style: { numFmt: '"QAR" #,##0.00' } }
+        ];
+
+        // Style the header row
+        const headerRow = worksheet.getRow(1);
+        headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+        headerRow.fill = {
+            type: 'pattern',
+            pattern: 'solid',
+            fgColor: { argb: 'FF4F46E5' } // Indigo-600
+        };
+        headerRow.alignment = { vertical: 'middle', horizontal: 'center' };
+        headerRow.height = 30;
+
+        // Add Data Rows
+        executiveSummary.forEach((s, idx) => {
+            worksheet.addRow({
+                serial: idx + 1,
+                customer: s.name,
+                totalQty: s.totalQty,
+                total10mm: s.total10mm,
+                total20mm: s.total20mm,
+                pct10mm: s.percentage10mm + '%',
+                pct20mm: s.percentage20mm + '%',
+                trips10mm: s.trips10mm,
+                trips20mm: s.trips20mm,
+                totalTrips: s.trips10mm + s.trips20mm,
+                invNo: s.invoiceNo || '-',
+                excess10mm: s.excess10mm,
+                totalValue: s.totalAmount
+            });
+        });
+
+        // Add Grand Total Row
         const totals = executiveSummary.reduce((acc, s) => ({
             totalQty: acc.totalQty + s.totalQty,
             total10mm: acc.total10mm + s.total10mm,
@@ -172,40 +383,231 @@ export function MatcherWorkspace({ currentStep, onStepChange }: MatcherWorkspace
             excess10mm: acc.excess10mm + s.excess10mm
         }), { totalQty: 0, total10mm: 0, total20mm: 0, trips10mm: 0, trips20mm: 0, totalAmount: 0, excess10mm: 0 });
 
-        exportData.push({
-            'Serial': '',
-            'Customer': 'GRAND TOTAL',
-            'Total Qty (MT)': totals.totalQty,
-            '10mm Qty (MT)': totals.total10mm,
-            '20mm Qty (MT)': totals.total20mm,
-            '10mm %': '',
-            '20mm %': '',
-            '10mm Trips': totals.trips10mm,
-            '20mm Trips': totals.trips20mm,
-            'Total Trips': totals.trips10mm + totals.trips20mm,
-            'Invoice No': '',
-            'Excess 10mm': totals.excess10mm,
-            'Total Value': totals.totalAmount
+        const totalRow = worksheet.addRow({
+            serial: '',
+            customer: 'GRAND TOTAL',
+            totalQty: totals.totalQty,
+            total10mm: totals.total10mm,
+            total20mm: totals.total20mm,
+            pct10mm: '',
+            pct20mm: '',
+            trips10mm: totals.trips10mm,
+            trips20mm: totals.trips20mm,
+            totalTrips: totals.trips10mm + totals.trips20mm,
+            invNo: '',
+            excess10mm: totals.excess10mm,
+            totalValue: totals.totalAmount
         });
 
-        const ws = XLSX.utils.json_to_sheet(exportData);
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, "Executive Summary");
+        // Style Total Row
+        totalRow.font = { bold: true };
+        totalRow.getCell('customer').alignment = { horizontal: 'right' };
+        totalRow.eachCell((cell, colNumber) => {
+            if (colNumber > 2) { // Skip Serial and Name
+                cell.border = {
+                    top: { style: 'double' }
+                };
+            }
+        });
 
-        // Generate filename with date
+        // Generate and Save
+        const buffer = await workbook.xlsx.writeBuffer();
         const dateStr = new Date().toISOString().split('T')[0];
-        XLSX.writeFile(wb, `Fatoora_Executive_Summary_${dateStr}.xlsx`);
-        toast.success("Report downloaded successfully!");
+
+        // Use Electron IPC to save file
+        // We need to send the buffer to the main process or use a blob download since we are in renderer?
+        // Actually, in web environment (like this renderer often mimics), Blob works.
+        // But for Electron full experience, let's use the save dialog if available or just Blob download as before.
+        // The previous code used XLSX.writeFile which in browser triggers download. 
+        // Let's use standard Blob download for simplicity and compatibility.
+
+        const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `Fatoora_Executive_Summary_${dateStr}.xlsx`;
+        a.click();
+        window.URL.revokeObjectURL(url);
+
+        toast.success("Executive Summary downloaded successfully!");
     };
-    const [outputFilePath, setOutputFilePath] = useState<string | null>(null);
     const [uniqueMatchValues, setUniqueMatchValues] = useState<string[]>([]);
 
     // Sync local step with prop if needed, or just use prop. We use prop `currentStep`.
+
+    // Persistence: Load State on Mount
+    useEffect(() => {
+        try {
+            const saved = localStorage.getItem(STORAGE_KEY);
+            if (saved) {
+                const data = JSON.parse(saved);
+
+                if (data.masterConfig) setMasterConfig(data.masterConfig);
+                if (data.targetConfigs) setTargetConfigs(data.targetConfigs);
+                if (data.outputFilePath) setOutputFilePath(data.outputFilePath);
+                if (data.noMatchLabel) setNoMatchLabel(data.noMatchLabel);
+                if (data.stats) setStats(data.stats);
+                if (data.perFileStats) setPerFileStats(data.perFileStats);
+                if (data.fileGenConfigs) setFileGenConfigs(data.fileGenConfigs);
+                if (data.outputFileHeaders) setOutputFileHeaders(data.outputFileHeaders);
+                if (data.outputFileData) setOutputFileData(data.outputFileData);
+                if (data.executiveSummary) setExecutiveSummary(data.executiveSummary);
+                if (data.groupTotals) setGroupTotals(data.groupTotals);
+
+                if (data.uniqueMatchValues) setUniqueMatchValues(data.uniqueMatchValues);
+
+                // If analysis was complete, restore 'done' step
+                if (data.stats && data.stats.totalMasterRows > 0) {
+                    onStepChange('done');
+                }
+
+                // Only show toast if we actually restored meaningful data
+                if (data.masterConfig || data.targetConfigs.length > 0) {
+                    toast.info("Resumed previous session");
+                }
+            }
+        } catch (e) {
+            console.error("Failed to load matcher state", e);
+        } finally {
+            setIsHydrated(true);
+        }
+    }, []);
+
+    // Persistence: Save State on Change
+    useEffect(() => {
+        if (!isHydrated) return;
+
+        try {
+            // Only save if we have some data to save, to avoid overwriting with empty on initial mount if effects run weirdly
+            // But we want to save empty if user clears it? 
+            // The reset function clears storage explicitly.
+            // Here we just save whatever is in state.
+            // Sanitize: If outputFileData is huge, don't save it to prevent crashing
+            // 5000 is a safe limit for localStorage (~5MB usually).
+            const safeOutputData = (outputFileData && outputFileData.length > 5000) ? [] : outputFileData;
+
+            const stateToSave = {
+                masterConfig,
+                targetConfigs,
+                outputFilePath,
+                noMatchLabel,
+                stats,
+                perFileStats,
+                fileGenConfigs,
+                outputFileHeaders,
+                outputFileData: safeOutputData,
+                executiveSummary,
+                groupTotals,
+
+                uniqueMatchValues
+            };
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(stateToSave));
+        } catch (e) {
+            console.error("Failed to save matcher state", e);
+        }
+    }, [
+        isHydrated,
+        masterConfig,
+        targetConfigs,
+        outputFilePath,
+        noMatchLabel,
+        stats,
+        perFileStats,
+        fileGenConfigs,
+        outputFileHeaders,
+        outputFileData,
+        executiveSummary,
+        groupTotals,
+
+        uniqueMatchValues
+    ]);
 
     // Load customers on mount
     useEffect(() => {
         loadCustomers();
     }, []);
+
+    // Calculate customer projections whenever configs or group totals change
+    useEffect(() => {
+        const proj: Record<string, { t10: number, t20: number }> = {};
+
+        // Initialize for all customers
+        customers.forEach(c => {
+            proj[c.id] = { t10: c.total10mm || 0, t20: c.total20mm || 0 };
+        });
+
+        // Add current group totals based on assignments
+        Object.entries(fileGenConfigs).forEach(([groupName, config]) => {
+            if (config.customerId && groupTotals[groupName]) {
+                const cid = config.customerId;
+                if (!proj[cid]) proj[cid] = { t10: 0, t20: 0 };
+
+                proj[cid].t10 += groupTotals[groupName].t10;
+                proj[cid].t20 += groupTotals[groupName].t20;
+            }
+        });
+        setCustomerProjections(proj);
+
+    }, [fileGenConfigs, groupTotals, customers]);
+
+    // Live Recalculation of Groups/Totals when Target Column changes
+    useEffect(() => {
+        const resultColIdx = fileGenConfigs['output']?.resultColIdx;
+
+        if (resultColIdx !== undefined && resultColIdx !== -1 && outputFileData.length > 0) {
+            // Find Qty Column index
+            const outputHeadersLower = outputFileHeaders.map(h => h.name.toLowerCase());
+            let qIdx = fileGenConfigs['output']?.quantityColIdx ?? -1;
+
+            // Auto-guess if not set
+            if (qIdx === -1) {
+                qIdx = outputHeadersLower.findIndex(h => h.includes('net') && h.includes('weight'));
+                if (qIdx === -1) qIdx = outputHeadersLower.findIndex(h => h.includes('weight'));
+                if (qIdx === -1) qIdx = outputHeadersLower.findIndex(h => h.includes('qty'));
+                if (qIdx === -1) qIdx = outputHeadersLower.findIndex(h => h.includes('quantity'));
+            }
+
+            const totals: Record<string, { total: number, t10: number, t20: number }> = {};
+            const unique = new Set<string>();
+            const headerName = outputFileHeaders.find(h => h.index === resultColIdx)?.name || '';
+
+            const dataRows = outputFileData.slice(1);
+
+            dataRows.forEach(row => {
+                const val = (row[resultColIdx] !== undefined && row[resultColIdx] !== null) ? String(row[resultColIdx]).trim() : '';
+                // Filter out empty, "not matched", and THE HEADER ITSELF
+                if (val &&
+                    val.toLowerCase() !== 'not matched' &&
+                    val !== noMatchLabel &&
+                    val !== headerName) {
+                    unique.add(val);
+
+                    // Totals Calculation
+                    let quantity = 0;
+                    if (qIdx !== -1 && qIdx < row.length) {
+                        const rawVal = row[qIdx];
+                        let parsed = 0;
+                        if (typeof rawVal === 'number') parsed = rawVal;
+                        else if (typeof rawVal === 'string') parsed = parseFloat(rawVal.replace(/[^0-9.]/g, ''));
+                        if (!isNaN(parsed)) quantity = parsed;
+                    }
+
+                    const fullRow = row.join(' ').toLowerCase();
+                    let is20 = fullRow.includes('20mm');
+                    let is10 = fullRow.includes('10mm');
+
+                    if (!totals[val]) totals[val] = { total: 0, t10: 0, t20: 0 };
+                    totals[val].total += quantity;
+                    if (is10) totals[val].t10 += quantity;
+                    if (is20) totals[val].t20 += quantity;
+                }
+            });
+
+            setGroupTotals(totals);
+            const sorted = Array.from(unique).sort();
+            setUniqueMatchValues(sorted);
+        }
+    }, [fileGenConfigs['output']?.resultColIdx, outputFileData, outputFileHeaders]);
 
     // ... (analyzeFile, handleSelectMaster, etc. - keep as is)
 
@@ -216,10 +618,61 @@ export function MatcherWorkspace({ currentStep, onStepChange }: MatcherWorkspace
             toast.error(`Failed to analyze: ${result.error}`);
             return null;
         }
+
+        // Fetch Preview for Mapping
+        const previewRes = await window.electron.readExcelPreview(filePath);
+
         return {
             ...result,
-            matchLabel: result.suggestedMatchLabel,
+            ...result,
+            // matchLabel: result.suggestedMatchLabel, // DISABLE GUESSING
+            matchLabel: undefined,
+            preview: previewRes.success ? previewRes.data : undefined
         } as FileConfig;
+    };
+
+
+    const handleConfirmMapping = (idCol: number, resultCol?: number, matchLabel?: string) => {
+        if (!mappingTarget) return;
+
+        if (mappingTarget.type === 'master') {
+            setMasterConfig(prev => prev ? ({
+                ...prev,
+                overrideIdColumn: idCol,
+                overrideResultColumn: resultCol
+            }) : null);
+        } else {
+            // Handle new customer creation from dialog if needed
+            if (matchLabel === '___NEW___') {
+                setCreatingCustomerForTargetIndex(mappingTarget.index);
+                setIsCreatingCustomer(true);
+                setIsCustomerDialogOpen(true);
+                setMapperOpen(false);
+                setMappingTarget(null);
+                return;
+            }
+
+            setTargetConfigs(prev => prev.map((c, i) =>
+                i === mappingTarget.index ? ({
+                    ...c,
+                    overrideIdColumn: idCol,
+                    matchLabel: matchLabel !== undefined ? matchLabel : c.matchLabel
+                }) : c
+            ));
+
+            // Chain to next file if available
+            const nextIndex = mappingTarget.index + 1;
+            if (nextIndex < targetConfigs.length) {
+                // Determine if we should pause slightly or just switch
+                // React state batching handles the switch cleanly
+                setMappingTarget({ type: 'target', index: nextIndex });
+                // Dialog remains open
+                return;
+            }
+        }
+
+        setMapperOpen(false);
+        setMappingTarget(null);
     };
 
     const handleSelectMaster = async () => {
@@ -232,6 +685,12 @@ export function MatcherWorkspace({ currentStep, onStepChange }: MatcherWorkspace
             const config = await analyzeFile(res.filePaths[0]);
             setMasterConfig(config);
             setIsAnalyzing(false);
+
+            // Trigger Mapper
+            if (config) {
+                setMappingTarget({ type: 'master', index: 0 });
+                setMapperOpen(true);
+            }
         }
     };
 
@@ -247,8 +706,16 @@ export function MatcherWorkspace({ currentStep, onStepChange }: MatcherWorkspace
                 const config = await analyzeFile(filePath);
                 if (config) configs.push(config);
             }
-            setTargetConfigs(configs);
+
+            const startIndex = targetConfigs.length;
+            setTargetConfigs(prev => [...prev, ...configs]);
             setIsAnalyzing(false);
+
+            // Trigger Mapper for the FIRST new file
+            if (configs.length > 0) {
+                setMappingTarget({ type: 'target', index: startIndex });
+                setMapperOpen(true);
+            }
         }
     };
 
@@ -262,10 +729,11 @@ export function MatcherWorkspace({ currentStep, onStepChange }: MatcherWorkspace
         ));
     };
 
-    const isReady = masterConfig?.idColumn &&
-        masterConfig?.resultColumn &&
+    const isReady =
+        (masterConfig?.overrideIdColumn !== undefined && masterConfig?.overrideIdColumn !== -1) && // Must be explicitly set and valid
+        (masterConfig?.overrideResultColumn !== undefined && masterConfig?.overrideResultColumn !== -1) && // Must be explicitly set and valid
         targetConfigs.length > 0 &&
-        targetConfigs.every(t => t.idColumn);
+        targetConfigs.every(t => t.overrideIdColumn !== undefined && t.overrideIdColumn !== -1 && !!t.matchLabel); // Must have valid ID col AND match label
 
     const handleProcess = async () => {
         if (!masterConfig?.filePath || !isReady) return;
@@ -279,10 +747,10 @@ export function MatcherWorkspace({ currentStep, onStepChange }: MatcherWorkspace
         const res = await window.electron.processExcelFiles({
             masterPath: masterConfig.filePath,
             targetPaths: targetConfigs.map(t => t.filePath!),
-            masterColIndices: [masterConfig.overrideIdColumn ?? masterConfig.idColumn!.index],
-            masterResultColIndex: masterConfig.overrideResultColumn ?? masterConfig.resultColumn!.index,
+            masterColIndices: [masterConfig.overrideIdColumn!],
+            masterResultColIndex: masterConfig.overrideResultColumn!,
             targetMatchColIndices: Object.fromEntries(
-                targetConfigs.map(t => [t.filePath!, [t.overrideIdColumn ?? t.idColumn!.index]])
+                targetConfigs.map(t => [t.filePath!, [t.overrideIdColumn!]])
             ),
             targetMatchStrings: Object.fromEntries(
                 targetConfigs.map(t => [t.filePath!, t.matchLabel || 'Matched'])
@@ -304,10 +772,6 @@ export function MatcherWorkspace({ currentStep, onStepChange }: MatcherWorkspace
             if (res.matchedRows) setMatchedRows(res.matchedRows);
             if (res.unmatchedPath) {
                 setUnmatchedPath(res.unmatchedPath);
-                const previewRes = await window.electron.readExcelPreview(res.unmatchedPath);
-                if (previewRes.success && previewRes.data) {
-                    setUnmatchedPreview(previewRes.data.slice(0, 50));
-                }
             }
 
             // Store output file info for invoice generation
@@ -329,12 +793,12 @@ export function MatcherWorkspace({ currentStep, onStepChange }: MatcherWorkspace
     };
 
     const loadCustomers = async () => {
-        setIsLoadingCustomers(true);
+
         const res = await window.electron.getCustomers();
         if (res.success && res.customers) {
             setCustomers(res.customers);
         }
-        setIsLoadingCustomers(false);
+
     };
 
     const handleCreateCustomer = async () => {
@@ -391,76 +855,6 @@ export function MatcherWorkspace({ currentStep, onStepChange }: MatcherWorkspace
         return { descriptionColIdx: d, quantityColIdx: q };
     };
 
-    const scanUniqueValues = (colIdx: number) => {
-        if (colIdx === -1 || !outputFileData.length) return;
-
-        // Get Header Name relative to the output file headers state
-        // outputFileHeaders stores {index, name}
-        const headerName = outputFileHeaders.find(h => h.index === colIdx)?.name || '';
-
-        const unique = new Set<string>();
-        // Skip header
-        const dataRows = outputFileData.slice(1);
-
-        dataRows.forEach(row => {
-            const val = String(row[colIdx] || '').trim();
-            // Filter out empty, "not matched", and THE HEADER ITSELF if it appears in data
-            if (val &&
-                val.toLowerCase() !== 'not matched' &&
-                val !== noMatchLabel &&
-                val !== headerName) {
-                unique.add(val);
-            }
-        });
-
-        const sorted = Array.from(unique).sort();
-        setUniqueMatchValues(sorted);
-
-        // Initialize configs for these values
-        setFileGenConfigs(prev => {
-            const next = { ...prev };
-
-            // Helper to find existing config from Target list to migrate settings
-            const findBestMatchConfig = (groupName: string) => {
-                // Try to find a target file where fileName or filePath contains 'groupName' or vice versa
-                const groupLower = groupName.toLowerCase();
-                const target = targetConfigs.find(t => {
-                    const fName = (t.fileName || '').toLowerCase();
-                    const fPath = (t.filePath || '').toLowerCase();
-                    // Check inclusion both ways for robustness
-                    return fName === groupLower ||
-                        fName.includes(groupLower) ||
-                        groupLower.includes(fName) ||
-                        fPath.includes(groupLower);
-                });
-
-                if (target && target.filePath && prev[target.filePath]) {
-                    return prev[target.filePath];
-                }
-                return null;
-            };
-
-            sorted.forEach(val => {
-                if (!next[val]) {
-                    // Try to migrate from existing target file configs
-                    const existing = findBestMatchConfig(val);
-
-                    next[val] = {
-                        customerId: existing?.customerId || null,
-                        rate10: existing?.rate10 || 0,
-                        rate20: existing?.rate20 || 0,
-                        descriptionColIdx: 0, // Not used for groups
-                        quantityColIdx: 0     // Not used for groups
-                    };
-                }
-            });
-            return next;
-        });
-
-        if (sorted.length > 0) {
-            toast.info(`Found ${sorted.length} unique groups (${sorted.join(', ')}).`);
-        }
-    };
 
     const handlePrepareGeneration = async () => {
         if (outputFileData.length === 0) {
@@ -483,7 +877,7 @@ export function MatcherWorkspace({ currentStep, onStepChange }: MatcherWorkspace
 
         // Create config for OUTPUT file
         const outputHeaders = outputFileHeaders.map(h => h.name);
-        const outputGuessed = guessColumns(outputHeaders);
+        // const outputGuessed = guessColumns(outputHeaders); 
         const lastColIdx = outputFileHeaders.length > 0 ? outputFileHeaders[outputFileHeaders.length - 1].index : -1;
 
         // Existing or default result column
@@ -495,28 +889,38 @@ export function MatcherWorkspace({ currentStep, onStepChange }: MatcherWorkspace
                 customerId: null,
                 rate10: defaultRate10,
                 rate20: defaultRate20,
-                descriptionColIdx: outputGuessed.descriptionColIdx,
-                quantityColIdx: outputGuessed.quantityColIdx,
-                resultColIdx: resultColIdx
+                rateExcess10: 0,
+                descriptionColIdx: -1, // Force manual selection
+                quantityColIdx: -1,    // Force manual selection
+                resultColIdx: -1       // Force manual selection
             }
         };
 
         // Also create configs for each TARGET file (original behavior)
         targetConfigs.forEach(tConfig => {
             const filePath = tConfig.filePath!;
-            const headers = tConfig.headers?.map(h => h.name) || [];
-            const guessed = guessColumns(headers);
+            // const headers = tConfig.headers?.map(h => h.name) || [];
+            // const guessed = guessColumns(headers); // Disabled guessing
 
             newConfigs[filePath] = fileGenConfigs[filePath] || {
                 customerId: null,
                 rate10: defaultRate10,
                 rate20: defaultRate20,
-                descriptionColIdx: guessed.descriptionColIdx,
-                quantityColIdx: guessed.quantityColIdx
+                rateExcess10: 0,
+                descriptionColIdx: -1, // Force manual selection
+                quantityColIdx: -1     // Force manual selection
             };
         });
 
-        // AUTO-SCAN: Scan for unique values immediately using the determined resultColIdx
+        // Calculate Group Totals
+        const totals: Record<string, { total: number, t10: number, t20: number }> = {};
+
+        // Find Qty Column index
+        const outputHeadersLower = outputHeaders.map(h => h.toLowerCase());
+        let qIdx = outputHeadersLower.findIndex(h => h.includes('net') && h.includes('weight'));
+        if (qIdx === -1) qIdx = outputHeadersLower.findIndex(h => h.includes('weight'));
+        if (qIdx === -1) qIdx = outputHeadersLower.findIndex(h => h.includes('qty'));
+
         if (resultColIdx !== -1 && outputFileData.length > 0) {
             const headerName = outputFileHeaders.find(h => h.index === resultColIdx)?.name || '';
             const unique = new Set<string>();
@@ -530,8 +934,29 @@ export function MatcherWorkspace({ currentStep, onStepChange }: MatcherWorkspace
                     val !== noMatchLabel &&
                     val !== headerName) {
                     unique.add(val);
+
+                    // Totals Calculation
+                    let quantity = 0;
+                    if (qIdx !== -1 && qIdx < row.length) {
+                        const rawVal = row[qIdx];
+                        let parsed = 0;
+                        if (typeof rawVal === 'number') parsed = rawVal;
+                        else if (typeof rawVal === 'string') parsed = parseFloat(rawVal.replace(/[^0-9.]/g, '')); // Basic parsing
+                        if (!isNaN(parsed)) quantity = parsed;
+                    }
+
+                    const fullRow = row.join(' ').toLowerCase();
+                    let is20 = fullRow.includes('20mm');
+                    let is10 = fullRow.includes('10mm');
+
+                    if (!totals[val]) totals[val] = { total: 0, t10: 0, t20: 0 };
+                    totals[val].total += quantity;
+                    if (is10) totals[val].t10 += quantity;
+                    if (is20) totals[val].t20 += quantity;
                 }
             });
+
+            setGroupTotals(totals);
 
             const sorted = Array.from(unique).sort();
             setUniqueMatchValues(sorted);
@@ -563,8 +988,9 @@ export function MatcherWorkspace({ currentStep, onStepChange }: MatcherWorkspace
                         customerId: existing?.customerId || null,
                         rate10: existing?.rate10 || defaultRate10,
                         rate20: existing?.rate20 || defaultRate20,
-                        descriptionColIdx: 0,
-                        quantityColIdx: 0
+                        rateExcess10: 0,
+                        descriptionColIdx: -1, // Force manual
+                        quantityColIdx: -1     // Force manual
                     };
                 } else {
                     // Start with existing
@@ -669,7 +1095,9 @@ export function MatcherWorkspace({ currentStep, onStepChange }: MatcherWorkspace
                     if (typeof rawVal === 'number') parsed = rawVal;
                     else if (typeof rawVal === 'string') parsed = parseFloat(rawVal.replace(/[^0-9.]/g, ''));
 
-                    if (!isNaN(parsed) && parsed > 0) quantity = parsed;
+                    if (!isNaN(parsed) && parsed > 0) {
+                        quantity = Math.round(parsed * 100) / 100;
+                    }
                 }
                 if (quantity > 1000000) {
                     console.warn(`Row ${idx + 2}: Unusually high quantity ${quantity}, please verify`);
@@ -687,7 +1115,7 @@ export function MatcherWorkspace({ currentStep, onStepChange }: MatcherWorkspace
 
                 if (customerMap.has(key)) {
                     const existing = customerMap.get(key);
-                    existing.quantity += quantity;
+                    existing.quantity = Math.round((existing.quantity + quantity) * 100) / 100;
                     existing.amount = Math.round(existing.quantity * existing.unitPrice * 100) / 100;
                 } else {
                     customerMap.set(key, {
@@ -727,7 +1155,128 @@ export function MatcherWorkspace({ currentStep, onStepChange }: MatcherWorkspace
                 }
 
                 // Create Invoice
-                const subtotal = items.reduce((sum: number, item: any) => sum + item.amount, 0);
+                // Find config for this customer
+                const customerConfigEntry = Object.entries(fileGenConfigs).find(([_, cfg]) => cfg.customerId === custId);
+                const customerConfig = customerConfigEntry ? customerConfigEntry[1] : null;
+
+                // SPLIT PRICING LOGIC (10mm & 20mm)
+                let workingItems = [...items];
+
+                const processSplit = (currentItems: any[], splitConfig: FileGenConfig['splitRates10'], itemType: string) => {
+                    if (!splitConfig || !splitConfig.enabled) return currentItems;
+
+                    const threshold = splitConfig.threshold || 0;
+                    const rate1 = splitConfig.rate1 || 0;
+                    const rate2 = splitConfig.rate2 || 0;
+
+                    let remainingTier1 = threshold;
+                    const resultItems: any[] = [];
+
+                    currentItems.forEach(item => {
+                        if (item.type !== itemType) {
+                            resultItems.push(item);
+                            return;
+                        }
+
+                        if (remainingTier1 > 0) {
+                            const alloc = Math.min(item.quantity, remainingTier1);
+
+                            // Tier 1 Portion
+                            resultItems.push({
+                                ...item,
+                                id: crypto.randomUUID(),
+                                unitPrice: rate1,
+                                amount: Math.round(alloc * rate1 * 100) / 100,
+                                quantity: alloc,
+                                description: item.description + ` (Tier 1)`
+                            });
+
+                            remainingTier1 -= alloc;
+
+                            // Tier 2 Remainder
+                            if (item.quantity > alloc) {
+                                const rem = Math.round((item.quantity - alloc) * 100) / 100;
+                                resultItems.push({
+                                    ...item,
+                                    id: crypto.randomUUID(),
+                                    unitPrice: rate2,
+                                    amount: Math.round(rem * rate2 * 100) / 100,
+                                    quantity: rem,
+                                    description: item.description + ` (Tier 2)`
+                                });
+                            }
+                        } else {
+                            // All Tier 2
+                            resultItems.push({
+                                ...item,
+                                unitPrice: rate2,
+                                amount: Math.round(item.quantity * rate2 * 100) / 100,
+                                description: item.description + ` (Tier 2)`
+                            });
+                        }
+                    });
+                    return resultItems;
+                };
+
+                // Apply splits
+                if (customerConfig) {
+                    workingItems = processSplit(workingItems, customerConfig.splitRates10, '10mm');
+                    workingItems = processSplit(workingItems, customerConfig.splitRates20, '20mm');
+                }
+
+                // Excess 10mm Logic
+                const excessRate = customerConfig ? customerConfig.rateExcess10 : 0;
+
+                const hist10 = customer.total10mm || 0;
+                const hist20 = customer.total20mm || 0;
+                const current10 = totals.t10;
+                const current20 = totals.t20;
+
+                const cum10 = hist10 + current10;
+                const cum20 = hist20 + current20;
+                const cumGrand = cum10 + cum20;
+
+                const cumAllowed10 = cumGrand * 0.40;
+                const cumExcess = Math.max(0, cum10 - cumAllowed10);
+
+                // We only want to bill for the NEW excess generated by this batch
+                const histExcess = Math.max(0, hist10 - (hist10 + hist20) * 0.40);
+
+                const excessQty = Math.max(0, cumExcess - histExcess);
+
+                if (excessQty > 0 && excessRate > 0) {
+                    let remainingdeduction = excessQty;
+                    const items10 = workingItems.filter(i => i.type === '10mm');
+                    let actuallyDeducted = 0;
+
+                    items10.forEach(item => {
+                        if (remainingdeduction <= 0) return;
+
+                        const deduct = Math.min(item.quantity, remainingdeduction);
+                        item.quantity = Math.round((item.quantity - deduct) * 100) / 100;
+                        item.amount = Math.round(item.quantity * item.unitPrice * 100) / 100;
+                        remainingdeduction = Math.round((remainingdeduction - deduct) * 100) / 100;
+                        actuallyDeducted = Math.round((actuallyDeducted + deduct) * 100) / 100;
+                    });
+
+                    // Create Excess Item if we actually converted anything
+                    if (actuallyDeducted > 0.001) {
+                        const excessItem = {
+                            id: crypto.randomUUID(),
+                            description: `Excess 10mm Charge (>40%)`,
+                            quantity: Math.round(actuallyDeducted * 100) / 100,
+                            unitPrice: excessRate,
+                            amount: Math.round(actuallyDeducted * excessRate * 100) / 100,
+                            type: '10mm' as const
+                        };
+                        workingItems.push(excessItem);
+                    }
+                }
+
+                // Filter out 0 quantity items
+                const finalItems = workingItems.filter(i => i.quantity > 0.001);
+
+                const subtotal = finalItems.reduce((sum: number, item: any) => sum + item.amount, 0);
                 const tax = subtotal * 0.05;
 
                 const newInvoice: any = {
@@ -744,15 +1293,15 @@ export function MatcherWorkspace({ currentStep, onStepChange }: MatcherWorkspace
                     to: {
                         customerId: customer.id,
                         name: customer.name,
-                        address: customer.address,
-                        email: customer.email || ''
+                        address: customer.address || '',
+                        email: customer.email || '',
+                        phone: customer.phone || ''
                     },
-                    items: items,
+                    items: finalItems,
                     subtotal: subtotal,
                     tax: tax,
                     total: subtotal + tax,
                     currency: 'QAR',
-                    notes: `Generated from Matching`,
                     createdAt: new Date().toISOString(),
                     updatedAt: new Date().toISOString(),
                 };
@@ -765,6 +1314,16 @@ export function MatcherWorkspace({ currentStep, onStepChange }: MatcherWorkspace
             if (successCount > 0) {
                 toast.success(`${successCount} invoice(s) generated successfully!`);
                 if (loadCustomers) loadCustomers();
+
+                // Auto-download Executive Summary if available
+                if (executiveSummary && executiveSummary.length > 0) {
+                    try {
+                        await handleExportSummary();
+                    } catch (error) {
+                        console.error('Failed to auto-download Executive Summary:', error);
+                        toast.warning('Invoices generated, but Executive Summary download failed.');
+                    }
+                }
             } else if (failCount > 0) {
                 toast.error("Failed to generate invoices.");
             } else {
@@ -795,16 +1354,14 @@ export function MatcherWorkspace({ currentStep, onStepChange }: MatcherWorkspace
     };
 
     const reset = () => {
+        localStorage.removeItem(STORAGE_KEY);
         setMasterConfig(null);
         setTargetConfigs([]);
         setNoMatchLabel('Not Matched');
-        setShowAdvanced(false);
         setStats(null);
         setPerFileStats(null);
         setMatchedRows([]); // Clear matched rows
         setUnmatchedPath(null);
-        setUnmatchedPreview(null);
-        setShowUnmatchedPreview(false);
         // Clear output file state
         setOutputFilePath(null);
         setOutputFileHeaders([]);
@@ -813,11 +1370,7 @@ export function MatcherWorkspace({ currentStep, onStepChange }: MatcherWorkspace
         onStepChange('configure'); // Use Prop
     };
 
-    const getConfidenceColor = (confidence?: string) => {
-        if (confidence === 'high') return 'text-success';
-        if (confidence === 'medium') return 'text-warning';
-        return 'text-muted-foreground';
-    };
+
 
 
 
@@ -832,29 +1385,6 @@ export function MatcherWorkspace({ currentStep, onStepChange }: MatcherWorkspace
                     </h2>
                     <div className="flex items-center gap-2">
                         {/* Generate Invoice Button in Results Step */}
-                        {currentStep === 'done' && outputFileData.length > 0 && (
-                            <>
-
-                                <Button
-                                    size="sm"
-                                    onClick={handlePrepareGeneration}
-                                    disabled={isGeneratingInvoices}
-                                    className="bg-primary hover:bg-primary/90 text-primary-foreground"
-                                >
-                                    {isGeneratingInvoices ? (
-                                        <>
-                                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                                            Generating...
-                                        </>
-                                    ) : (
-                                        <>
-                                            <Receipt className="w-4 h-4 mr-2" />
-                                            Generate Invoices
-                                        </>
-                                    )}
-                                </Button>
-                            </>
-                        )}
                         <Button variant="ghost" size="sm" onClick={reset} className="text-muted-foreground">
                             <RefreshCw className="w-4 h-4 mr-2" />
                             Reset
@@ -862,223 +1392,94 @@ export function MatcherWorkspace({ currentStep, onStepChange }: MatcherWorkspace
                     </div>
                 </header>
 
-                {/* Customer Selection Dialog */}
+                {/* Invoice Generation Configuration Wizard */}
+                <InvoiceGenerationDialog
+                    isOpen={isCustomerDialogOpen && !isCreatingCustomer}
+                    onClose={() => setIsCustomerDialogOpen(false)}
+                    fileGenConfigs={fileGenConfigs}
+                    onUpdateConfig={updateFileConfig}
+                    uniqueMatchValues={uniqueMatchValues}
+                    customers={customers}
+                    outputFileHeaders={outputFileHeaders}
+                    outputFilePath={outputFilePath}
+                    groupTotals={groupTotals}
+                    customerProjections={customerProjections}
+                    onCreateCustomer={() => setIsCreatingCustomer(true)}
+                    onGenerate={handleConfirmGeneration}
+                    onGenerateSummary={handleGenerateSummary}
+                    isGenerating={isGeneratingInvoices}
+                />
+
+                {/* Create Customer Dialog (Overlay) */}
                 <GlassDialog
-                    isOpen={isCustomerDialogOpen}
-                    onClose={() => {
-                        setIsCustomerDialogOpen(false);
-                        setIsCreatingCustomer(false);
-                        setNewCustomerData({ name: '', email: '', phone: '', address: '' });
-                    }}
-                    title={isCreatingCustomer ? "Create New Customer" : "Generation Settings"}
-                    description={isCreatingCustomer ? "Enter customer details below." : "Assign customers and rates to each file."}
-                    className="max-w-3xl"
+                    isOpen={isCreatingCustomer}
+                    onClose={() => setIsCreatingCustomer(false)}
+                    title="Create New Customer"
+                    description="Enter customer details below."
+                    className="max-w-xl"
                 >
                     <div className="space-y-4">
-                        {isCreatingCustomer ? (
-                            <div className="space-y-3 animate-in fade-in slide-in-from-right-4 duration-200">
-                                {/* SAME CREATION FORM AS BEFORE */}
-                                <div className="space-y-1">
-                                    <label className="text-xs font-medium">Name *</label>
-                                    <Input
-                                        value={newCustomerData.name}
-                                        onChange={(e) => setNewCustomerData({ ...newCustomerData, name: e.target.value })}
-                                        placeholder="Business Name"
-                                    />
-                                </div>
-                                <div className="space-y-1">
-                                    <label className="text-xs font-medium">Email</label>
-                                    <Input
-                                        value={newCustomerData.email}
-                                        onChange={(e) => setNewCustomerData({ ...newCustomerData, email: e.target.value })}
-                                        placeholder="email@example.com"
-                                    />
-                                </div>
-                                <div className="space-y-1">
-                                    <label className="text-xs font-medium">Phone</label>
-                                    <Input
-                                        value={newCustomerData.phone}
-                                        onChange={(e) => setNewCustomerData({ ...newCustomerData, phone: e.target.value })}
-                                        placeholder="+974 ..."
-                                    />
-                                </div>
-                                <div className="space-y-1">
-                                    <label className="text-xs font-medium">Address</label>
-                                    <Input
-                                        value={newCustomerData.address}
-                                        onChange={(e) => setNewCustomerData({ ...newCustomerData, address: e.target.value })}
-                                        placeholder="Building, Street, Zone"
-                                    />
-                                </div>
-                                <div className="flex justify-end pt-2 gap-2">
-                                    <Button variant="ghost" onClick={() => setIsCreatingCustomer(false)}>
-                                        Back to List
-                                    </Button>
-                                    <Button onClick={handleCreateCustomer}>
-                                        Save & Return
-                                    </Button>
-                                </div>
+                        <div className="space-y-3 animate-in fade-in slide-in-from-right-4 duration-200">
+                            <div className="space-y-1">
+                                <label className="text-xs font-medium">Name *</label>
+                                <Input
+                                    value={newCustomerData.name}
+                                    onChange={(e) => setNewCustomerData({ ...newCustomerData, name: e.target.value })}
+                                    placeholder="Business Name"
+                                />
                             </div>
-                        ) : (
-                            <div className="flex flex-col h-[500px]">
-                                {isLoadingCustomers ? (
-                                    <div className="flex items-center justify-center flex-1">
-                                        <Loader2 className="w-8 h-8 animate-spin text-primary" />
-                                    </div>
-                                ) : (
-                                    <div className="flex-1 overflow-y-auto space-y-4 pr-2">
-                                        {/* OUTPUT MASTER FILE SECTION */}
-                                        {fileGenConfigs['output'] && (
-                                            <>
-                                                <div className="mb-2">
-                                                    <h3 className="text-sm font-semibold text-foreground mb-1">Output Master File</h3>
-                                                    <p className="text-xs text-muted-foreground">Configure invoice generation from the matched output file</p>
-                                                </div>
-                                                <div className="p-4 rounded-xl border-2 border-primary/30 bg-primary/5 space-y-3">
-                                                    <div className="flex items-center gap-3">
-                                                        <div className="w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center">
-                                                            <FileSpreadsheet className="w-4 h-4 text-primary" />
-                                                        </div>
-                                                        <div className="font-medium text-sm flex-1 truncate">
-                                                            {outputFilePath ? outputFilePath.split(/[\\/]/).pop() : 'Output File'}
-                                                        </div>
-                                                    </div>
-                                                    <div className="grid grid-cols-2 gap-4">
-                                                        <div className="space-y-1">
-                                                            <label className="text-[10px] font-medium text-muted-foreground uppercase">Description Column</label>
-                                                            <select
-                                                                className="w-full h-9 rounded-md border border-input bg-background/50 px-3 text-sm focus:border-primary"
-                                                                value={fileGenConfigs['output'].descriptionColIdx ?? -1}
-                                                                onChange={(e) => updateFileConfig('output', { descriptionColIdx: parseInt(e.target.value) })}
-                                                            >
-                                                                <option value={-1}>Select Column...</option>
-                                                                {outputFileHeaders.map(h => (
-                                                                    <option key={h.index} value={h.index}>{h.name}</option>
-                                                                ))}
-                                                            </select>
-                                                        </div>
-                                                        <div className="space-y-1">
-                                                            <label className="text-[10px] font-medium text-muted-foreground uppercase">Quantity Column</label>
-                                                            <select
-                                                                className="w-full h-9 rounded-md border border-input bg-background/50 px-3 text-sm focus:border-primary"
-                                                                value={fileGenConfigs['output'].quantityColIdx ?? -1}
-                                                                onChange={(e) => updateFileConfig('output', { quantityColIdx: parseInt(e.target.value) })}
-                                                            >
-                                                                <option value={-1}>Select Column...</option>
-                                                                {outputFileHeaders.map(h => (
-                                                                    <option key={h.index} value={h.index}>{h.name}</option>
-                                                                ))}
-                                                            </select>
-                                                        </div>
-                                                        <div className="col-span-2 space-y-1 border-t border-border/50 pt-2 mt-2">
-                                                            <label className="text-[10px] font-medium text-muted-foreground uppercase">Results/Match Column (File Name)</label>
-                                                            <select
-                                                                className="w-full h-9 rounded-md border border-input bg-background/50 px-3 text-sm focus:border-primary"
-                                                                value={fileGenConfigs['output'].resultColIdx ?? (outputFileHeaders.length > 0 ? outputFileHeaders[outputFileHeaders.length - 1].index : -1)}
-                                                                onChange={(e) => { const idx = parseInt(e.target.value); updateFileConfig('output', { resultColIdx: idx }); scanUniqueValues(idx); }}
-                                                            >
-                                                                <option value={-1}>Select Column...</option>
-                                                                {outputFileHeaders.map(h => (
-                                                                    <option key={h.index} value={h.index}>{h.name}</option>
-                                                                ))}
-                                                            </select>
-                                                            <p className="text-[10px] text-muted-foreground">Select the column containing the matched file names (usually the last column)</p>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </>
-                                        )}
-                                        {/* TARGET FILES SECTION */}
-                                        {uniqueMatchValues.length > 0 && (
-                                            <div className="flex items-center gap-3 py-2">
-                                                <div className="flex-1 h-px bg-border"></div>
-                                                <span className="text-xs text-muted-foreground font-medium">Matched Groups</span>
-                                                <div className="flex-1 h-px bg-border"></div>
-                                            </div>
-                                        )}
-                                        {uniqueMatchValues.map((matchVal) => {
-                                            const config = fileGenConfigs[matchVal];
-                                            if (!config) return null;
-
-                                            return (
-                                                <div key={matchVal} className="p-4 rounded-xl border bg-card/50 space-y-3">
-                                                    <div className="flex items-center gap-3">
-                                                        <div className="w-8 h-8 rounded-lg bg-secondary/80 flex items-center justify-center">
-                                                            <Files className="w-4 h-4 text-primary" />
-                                                        </div>
-                                                        <div className="font-medium text-sm flex-1 truncate">{matchVal}</div>
-                                                        <Badge variant={config.customerId ? "default" : "outline"} className="text-[10px]">
-                                                            {config.customerId ? 'Ready' : 'Incomplete'}
-                                                        </Badge>
-                                                    </div>
-
-                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                                        <div className="space-y-1">
-                                                            <label className="text-[10px] font-medium text-muted-foreground uppercase">Customer</label>
-                                                            <select
-                                                                className="w-full h-9 rounded-md border border-input bg-background/50 px-3 text-sm focus:border-primary"
-                                                                value={config.customerId || ''}
-                                                                onChange={(e) => updateFileConfig(matchVal, { customerId: e.target.value })}
-                                                            >
-                                                                <option value="">Select Customer...</option>
-                                                                {customers.map(c => (
-                                                                    <option key={c.id} value={c.id}>{c.name}</option>
-                                                                ))}
-                                                            </select>
-                                                        </div>
-
-                                                        <div className="grid grid-cols-2 gap-2">
-                                                            <div className="space-y-1">
-                                                                <label className="text-[10px] font-medium text-muted-foreground uppercase">Rate 10mm</label>
-                                                                <div className="relative">
-                                                                    <Input
-                                                                        type="number"
-                                                                        className="h-9 px-2 text-right font-mono"
-                                                                        placeholder="0.00"
-                                                                        value={config.rate10 || ''}
-                                                                        onChange={(e) => updateFileConfig(matchVal, { rate10: parseFloat(e.target.value) || 0 })}
-                                                                    />
-                                                                    <span className="absolute left-2 top-2.5 text-xs text-muted-foreground">QAR</span>
-                                                                </div>
-                                                            </div>
-                                                            <div className="space-y-1">
-                                                                <label className="text-[10px] font-medium text-muted-foreground uppercase">Rate 20mm</label>
-                                                                <div className="relative">
-                                                                    <Input
-                                                                        type="number"
-                                                                        className="h-9 px-2 text-right font-mono"
-                                                                        placeholder="0.00"
-                                                                        value={config.rate20 || ''}
-                                                                        onChange={(e) => updateFileConfig(matchVal, { rate20: parseFloat(e.target.value) || 0 })}
-                                                                    />
-                                                                    <span className="absolute left-2 top-2.5 text-xs text-muted-foreground">QAR</span>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-                                )}
-
-                                <div className="flex justify-between pt-4 mt-2 border-t border-border/50 bg-background/50 z-10">
-                                    <Button variant="outline" size="sm" onClick={() => setIsCreatingCustomer(true)}>
-                                        <Plus className="w-4 h-4 mr-2" /> New Customer
-                                    </Button>
-                                    <div className="flex gap-2">
-                                        <Button variant="ghost" onClick={() => setIsCustomerDialogOpen(false)}>
-                                            Cancel
-                                        </Button>
-                                        <Button onClick={handleConfirmGeneration} className="bg-primary text-primary-foreground hover:bg-primary/90">
-                                            Generate Invoices (Batch)
-                                        </Button>
-                                    </div>
-                                </div>
+                            <div className="space-y-1">
+                                <label className="text-xs font-medium">Email</label>
+                                <Input
+                                    value={newCustomerData.email}
+                                    onChange={(e) => setNewCustomerData({ ...newCustomerData, email: e.target.value })}
+                                    placeholder="email@example.com"
+                                />
                             </div>
-                        )}
+                            <div className="space-y-1">
+                                <label className="text-xs font-medium">Phone</label>
+                                <Input
+                                    value={newCustomerData.phone}
+                                    onChange={(e) => setNewCustomerData({ ...newCustomerData, phone: e.target.value })}
+                                    placeholder="+974 ..."
+                                />
+                            </div>
+                            <div className="space-y-1">
+                                <label className="text-xs font-medium">Address</label>
+                                <Input
+                                    value={newCustomerData.address}
+                                    onChange={(e) => setNewCustomerData({ ...newCustomerData, address: e.target.value })}
+                                    placeholder="Building, Street, Zone"
+                                />
+                            </div>
+                            <div className="flex justify-end pt-2 gap-2">
+                                <Button variant="ghost" onClick={() => setIsCreatingCustomer(false)}>
+                                    Cancel
+                                </Button>
+                                <Button onClick={handleCreateCustomer}>
+                                    Save Customer
+                                </Button>
+                            </div>
+                        </div>
                     </div>
                 </GlassDialog>
+
+                {/* Column Mapper */}
+                {mappingTarget && (
+                    <ColumnMapper
+                        open={mapperOpen}
+                        onOpenChange={setMapperOpen}
+                        fileType={mappingTarget.type}
+                        fileName={mappingTarget.type === 'master' ? masterConfig?.fileName || '' : targetConfigs[mappingTarget.index]?.fileName || ''}
+                        headers={mappingTarget.type === 'master' ? masterConfig?.headers || [] : targetConfigs[mappingTarget.index]?.headers || []}
+                        previewData={mappingTarget.type === 'master' ? masterConfig?.preview || [] : targetConfigs[mappingTarget.index]?.preview || []}
+                        customers={customers}
+                        initialIdCol={mappingTarget.type === 'master' ? (masterConfig?.overrideIdColumn ?? -1) : (targetConfigs[mappingTarget.index]?.overrideIdColumn ?? -1)}
+                        initialResultCol={mappingTarget.type === 'master' ? (masterConfig?.overrideResultColumn ?? -1) : -1}
+                        initialMatchLabel={mappingTarget.type === 'target' ? targetConfigs[mappingTarget.index]?.matchLabel : undefined}
+                        onConfirm={handleConfirmMapping}
+                    />
+                )}
 
                 {/* Content */}
                 <ScrollArea className="flex-1">
@@ -1090,26 +1491,24 @@ export function MatcherWorkspace({ currentStep, onStepChange }: MatcherWorkspace
                                     {/* Master File */}
                                     <Card
                                         className={cn(
-                                            "cursor-pointer transition-all hover:border-primary/50",
-                                            masterConfig && "border-success/50"
+                                            "cursor-pointer group relative overflow-hidden transition-all duration-300 hover:shadow-xl hover:-translate-y-1 hover:border-emerald-500/30",
+                                            masterConfig ? "border-emerald-500/50 bg-emerald-50/10" : "border-dashed border-4 hover:bg-secondary/30",
+                                            "h-64 flex flex-col justify-center items-center"
                                         )}
                                         onClick={handleSelectMaster}
                                     >
-                                        <CardContent className="pt-6">
-                                            <div className="flex flex-col items-center text-center space-y-3">
+                                        <CardContent className="p-0 w-full">
+                                            <div className="flex flex-col items-center text-center space-y-6">
                                                 <div className={cn(
-                                                    "w-12 h-12 rounded-xl flex items-center justify-center",
-                                                    masterConfig ? "bg-success text-white" : "bg-secondary text-muted-foreground"
+                                                    "w-24 h-24 rounded-3xl flex items-center justify-center transition-colors shadow-sm",
+                                                    masterConfig ? "bg-emerald-100 text-emerald-600 ring-4 ring-emerald-500/20" : "bg-secondary text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary"
                                                 )}>
-                                                    {masterConfig ? <Check className="w-6 h-6" /> : <FileSpreadsheet className="w-6 h-6" />}
+                                                    {masterConfig ? <Check className="w-12 h-12" /> : <FileSpreadsheet className="w-12 h-12" />}
                                                 </div>
                                                 {masterConfig ? (
-                                                    <div className="font-medium truncate max-w-full">{masterConfig.fileName}</div>
+                                                    <div className="font-bold text-xl text-emerald-700 bg-emerald-50 px-6 py-2 rounded-full border-2 border-emerald-100">{masterConfig.fileName}</div>
                                                 ) : (
-                                                    <div>
-                                                        <div className="font-medium">Master File</div>
-                                                        <div className="text-sm text-muted-foreground">Click to select</div>
-                                                    </div>
+                                                    <div className="text-3xl font-bold text-foreground">Master File</div>
                                                 )}
                                             </div>
                                         </CardContent>
@@ -1118,26 +1517,24 @@ export function MatcherWorkspace({ currentStep, onStepChange }: MatcherWorkspace
                                     {/* Target Files */}
                                     <Card
                                         className={cn(
-                                            "cursor-pointer transition-all hover:border-primary/50",
-                                            targetConfigs.length > 0 && "border-success/50"
+                                            "cursor-pointer group relative overflow-hidden transition-all duration-300 hover:shadow-xl hover:-translate-y-1 hover:border-blue-500/30",
+                                            targetConfigs.length > 0 ? "border-blue-500/50 bg-blue-50/10" : "border-dashed border-4 hover:bg-secondary/30",
+                                            "h-64 flex flex-col justify-center items-center"
                                         )}
                                         onClick={handleSelectTargets}
                                     >
-                                        <CardContent className="pt-6">
-                                            <div className="flex flex-col items-center text-center space-y-3">
+                                        <CardContent className="p-0 w-full">
+                                            <div className="flex flex-col items-center text-center space-y-6">
                                                 <div className={cn(
-                                                    "w-12 h-12 rounded-xl flex items-center justify-center",
-                                                    targetConfigs.length > 0 ? "bg-success text-white" : "bg-secondary text-muted-foreground"
+                                                    "w-24 h-24 rounded-3xl flex items-center justify-center transition-colors shadow-sm",
+                                                    targetConfigs.length > 0 ? "bg-blue-100 text-blue-600 ring-4 ring-blue-500/20" : "bg-secondary text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary"
                                                 )}>
-                                                    {targetConfigs.length > 0 ? <Files className="w-6 h-6" /> : <FolderOpen className="w-6 h-6" />}
+                                                    {targetConfigs.length > 0 ? <Files className="w-12 h-12" /> : <Files className="w-12 h-12 opacity-50" />}
                                                 </div>
                                                 {targetConfigs.length > 0 ? (
-                                                    <div className="font-medium">{targetConfigs.length} Target File{targetConfigs.length !== 1 ? 's' : ''}</div>
+                                                    <div className="font-bold text-xl text-blue-700 bg-blue-50 px-6 py-2 rounded-full border-2 border-blue-100">{targetConfigs.length} Files Loaded</div>
                                                 ) : (
-                                                    <div>
-                                                        <div className="font-medium">Target Files</div>
-                                                        <div className="text-sm text-muted-foreground">Click to select</div>
-                                                    </div>
+                                                    <div className="text-3xl font-bold text-foreground">Customer Files</div>
                                                 )}
                                             </div>
                                         </CardContent>
@@ -1154,108 +1551,126 @@ export function MatcherWorkspace({ currentStep, onStepChange }: MatcherWorkspace
 
                                 {/* Auto-Config Summary */}
                                 {masterConfig && (
-                                    <Card>
-                                        <CardHeader className="pb-3">
+                                    <Card className="border-2 shadow-sm">
+                                        <CardHeader className="pb-4">
                                             <div className="flex items-center justify-between">
-                                                <CardTitle className="text-base flex items-center gap-2">
-                                                    <Sparkles className="w-4 h-4 text-primary" />
+                                                <CardTitle className="text-xl flex items-center gap-3">
+                                                    <Sparkles className="w-6 h-6 text-primary" />
                                                     Matching Configuration
                                                 </CardTitle>
-                                                <Badge variant="secondary" className="text-xs">
-                                                    {masterConfig.dataRowCount} rows
+                                                <Badge variant="secondary" className="text-sm px-3 py-1">
+                                                    {masterConfig?.dataRowCount} rows
                                                 </Badge>
                                             </div>
                                         </CardHeader>
-                                        <CardContent className="space-y-4">
+                                        <CardContent className="space-y-6">
                                             {/* Master Config */}
-                                            <div className="p-3 rounded-lg bg-secondary/50 space-y-2">
+                                            <div className="p-5 rounded-xl bg-secondary/30 border border-border/50 space-y-4">
                                                 <div className="flex items-center justify-between">
-                                                    <span className="text-sm font-medium">Master: {masterConfig.fileName}</span>
-                                                    <Check className="w-4 h-4 text-success" />
-                                                </div>
-                                                <div className="grid grid-cols-2 gap-2 text-xs">
-                                                    <div className="flex items-center gap-1">
-                                                        <span className="text-muted-foreground">ID Column:</span>
-                                                        <span className={cn("font-mono", getConfidenceColor(masterConfig.idColumn?.confidence))}>
-                                                            {masterConfig.idColumn?.name || 'Not found'}
-                                                        </span>
-                                                        {masterConfig.idColumn?.confidence === 'high' && (
-                                                            <Badge variant="default" className="text-[10px] px-1 py-0">auto</Badge>
-                                                        )}
+                                                    <span className="text-lg font-bold flex-1">Master: {masterConfig.fileName}</span>
+                                                    <div className="bg-success/20 p-1 rounded-full">
+                                                        <Check className="w-5 h-5 text-success" />
                                                     </div>
-                                                    <div className="flex items-center gap-1">
-                                                        <span className="text-muted-foreground">Output:</span>
-                                                        <span className="font-mono">
-                                                            {masterConfig.resultColumn?.isNew ? '(New Column)' : masterConfig.resultColumn?.name}
-                                                        </span>
+                                                </div>
+                                                <div className="grid grid-cols-2 gap-4">
+                                                    <div className="flex flex-col gap-2">
+                                                        <span className="text-sm font-medium text-muted-foreground">ID Column</span>
+                                                        <select
+                                                            className="w-full h-12 rounded-lg border border-input bg-background px-3 text-base focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
+                                                            value={masterConfig.overrideIdColumn ?? -1}
+                                                            onChange={(e) => {
+                                                                const val = parseInt(e.target.value);
+                                                                setMasterConfig(prev => prev ? {
+                                                                    ...prev,
+                                                                    overrideIdColumn: val === -1 ? undefined : val
+                                                                } : null);
+                                                            }}
+                                                        >
+                                                            <option value={-1}>
+                                                                Select Column...
+                                                            </option>
+                                                            {masterConfig?.headers?.map(h => (
+                                                                <option key={h.index} value={h.index}>{h.name}</option>
+                                                            ))}
+                                                        </select>
+                                                    </div>
+                                                    <div className="flex flex-col gap-2">
+                                                        <span className="text-sm font-medium text-muted-foreground">Output Column</span>
+                                                        <select
+                                                            className="w-full h-12 rounded-lg border border-input bg-background px-3 text-base focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
+                                                            value={masterConfig.overrideResultColumn ?? -1}
+                                                            onChange={(e) => {
+                                                                const val = parseInt(e.target.value);
+                                                                setMasterConfig(prev => prev ? {
+                                                                    ...prev,
+                                                                    overrideResultColumn: val === -1 ? undefined : val
+                                                                } : null);
+                                                            }}
+                                                        >
+                                                            <option value={-1}>
+                                                                Auto ({masterConfig.resultColumn?.isNew ? 'New Column' : masterConfig.resultColumn?.name})
+                                                            </option>
+                                                            {masterConfig.headers?.map(h => (
+                                                                <option key={h.index} value={h.index}>{h.name}</option>
+                                                            ))}
+                                                        </select>
                                                     </div>
                                                 </div>
                                             </div>
-
-                                            {/* Column Names Display */}
 
 
                                             {/* Target Configs */}
                                             {targetConfigs.map((target, idx) => (
-                                                <div key={idx} className="p-3 rounded-lg bg-secondary/50 space-y-2">
+                                                <div key={idx} className="p-5 rounded-xl bg-secondary/30 border border-border/50 space-y-4">
                                                     <div className="flex items-center justify-between">
-                                                        <span className="text-sm font-medium truncate flex-1">{target.fileName}</span>
+                                                        <span className="text-lg font-bold flex-1">{target.fileName}</span>
                                                         <Button
                                                             variant="ghost"
                                                             size="icon"
-                                                            className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                                                            className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-full"
                                                             onClick={(e) => { e.stopPropagation(); removeTarget(idx); }}
                                                         >
-                                                            <Trash2 className="w-4 h-4" />
+                                                            <Trash2 className="w-5 h-5" />
                                                         </Button>
                                                     </div>
-                                                    <div className="grid grid-cols-2 gap-2 text-xs">
-                                                        <div className="flex items-center gap-1">
-                                                            <span className="text-muted-foreground w-8">ID:</span>
-                                                            <select
-                                                                className="flex-1 h-8 rounded-md border border-input bg-background/50 px-2 text-xs focus:border-primary"
-                                                                value={target.overrideIdColumn ?? -1}
-                                                                onChange={(e) => {
-                                                                    const val = parseInt(e.target.value);
-                                                                    setTargetConfigs(prev => prev.map((c, i) =>
-                                                                        i === idx ? { ...c, overrideIdColumn: val === -1 ? undefined : val } : c
-                                                                    ));
-                                                                }}
-                                                                onClick={(e) => e.stopPropagation()}
-                                                            >
-                                                                <option value={-1}>
-                                                                    Auto ({target.idColumn?.name || 'None'})
-                                                                </option>
-                                                                {target.headers?.map(h => (
-                                                                    <option key={h.index} value={h.index}>{h.name}</option>
-                                                                ))}
-                                                            </select>
-                                                        </div>
-                                                        <div className="flex items-center gap-1">
-                                                            <label className="text-muted-foreground w-10">Label:</label>
-                                                            <div className="flex-1">
-                                                                <select
-                                                                    className="w-full h-8 rounded-md border border-input bg-background/50 px-2 text-xs focus:border-primary"
-                                                                    value={target.matchLabel || ''}
-                                                                    onChange={(e) => {
-                                                                        const val = e.target.value;
-                                                                        if (val === '___NEW___') {
-                                                                            setCreatingCustomerForTargetIndex(idx);
-                                                                            setIsCreatingCustomer(true);
-                                                                            setIsCustomerDialogOpen(true);
-                                                                        } else {
-                                                                            updateTargetLabel(idx, val);
-                                                                        }
+                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                        <div className="flex flex-col gap-2">
+                                                            <div className="flex justify-between items-center">
+                                                                <span className="text-sm font-medium text-muted-foreground">Mapping Configuration</span>
+                                                                <Button
+                                                                    variant="outline"
+                                                                    size="sm"
+                                                                    className="h-8 gap-2 text-primary border-primary/20 hover:bg-primary/5"
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        setMappingTarget({ type: 'target', index: idx });
+                                                                        setMapperOpen(true);
                                                                     }}
-                                                                    onClick={(e) => e.stopPropagation()}
                                                                 >
-                                                                    <option value="">Select Customer...</option>
-                                                                    {customers.map(c => (
-                                                                        <option key={c.id} value={c.name}>{c.name}</option>
-                                                                    ))}
-                                                                    <option disabled>──────────</option>
-                                                                    <option value="___NEW___">+ Create New Customer</option>
-                                                                </select>
+                                                                    <Sparkles className="w-3.5 h-3.5" />
+                                                                    Map Columns / Preview
+                                                                </Button>
+                                                            </div>
+                                                            <div className="flex items-center gap-2 p-3 bg-background/50 rounded-lg border border-border/50 text-sm">
+                                                                <div className="flex-1 truncate">
+                                                                    <span className="text-muted-foreground mr-2">ID Column:</span>
+                                                                    <span className="font-medium">
+                                                                        {target.overrideIdColumn !== undefined
+                                                                            ? (target.headers?.find(h => h.index === target.overrideIdColumn)?.name || `Col ${target.overrideIdColumn + 1}`)
+                                                                            : <span className="text-muted-foreground italic">Auto</span>
+                                                                        }
+                                                                    </span>
+                                                                </div>
+                                                                <div className="flex-1 truncate border-l pl-2 border-border/50">
+                                                                    <span className="text-muted-foreground mr-2">Label:</span>
+                                                                    {target.matchLabel ? (
+                                                                        <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                                                                            {target.matchLabel}
+                                                                        </Badge>
+                                                                    ) : (
+                                                                        <span className="text-destructive font-bold text-xs">Missing</span>
+                                                                    )}
+                                                                </div>
                                                             </div>
                                                         </div>
                                                     </div>
@@ -1263,95 +1678,39 @@ export function MatcherWorkspace({ currentStep, onStepChange }: MatcherWorkspace
                                             ))}
 
                                             {/* No-match label */}
-                                            <div className="flex items-center gap-3 text-sm">
-                                                <span className="text-muted-foreground">No match label:</span>
+                                            <div className="flex items-center gap-4 pt-2">
+                                                <span className="text-base font-medium text-muted-foreground">Label for unmatched items:</span>
                                                 <Input
-                                                    className="h-8 w-40"
+                                                    className="h-12 w-64 text-base"
                                                     value={noMatchLabel}
                                                     onChange={(e) => setNoMatchLabel(e.target.value)}
+                                                    placeholder="Type label..."
                                                 />
                                             </div>
                                         </CardContent>
                                     </Card>
                                 )}
 
-                                {/* Advanced Options Toggle */}
-                                {masterConfig && (
-                                    <button
-                                        onClick={() => setShowAdvanced(!showAdvanced)}
-                                        className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
-                                    >
-                                        <Settings2 className="w-4 h-4" />
-                                        Advanced Options
-                                        {showAdvanced ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                                    </button>
-                                )}
 
-                                {/* Advanced Options Panel */}
-                                {showAdvanced && masterConfig && (
-                                    <Card className="border-dashed">
-                                        <CardHeader>
-                                            <CardTitle className="text-sm">Override Auto-Detection</CardTitle>
-                                            <CardDescription className="text-xs">
-                                                Manually select columns if the auto-detection was incorrect.
-                                            </CardDescription>
-                                        </CardHeader>
-                                        <CardContent className="space-y-4">
-                                            <div className="grid grid-cols-2 gap-4">
-                                                <div>
-                                                    <label className="text-xs font-medium text-muted-foreground">Master ID Column</label>
-                                                    <select
-                                                        className="w-full mt-1 h-9 rounded-md border border-input bg-background px-3 text-sm"
-                                                        value={masterConfig.overrideIdColumn ?? masterConfig.idColumn?.index ?? ''}
-                                                        onChange={(e) => setMasterConfig(prev => prev ? {
-                                                            ...prev,
-                                                            overrideIdColumn: e.target.value ? parseInt(e.target.value) : undefined
-                                                        } : null)}
-                                                    >
-                                                        {masterConfig.headers?.map(h => (
-                                                            <option key={h.index} value={h.index}>{h.name}</option>
-                                                        ))}
-                                                    </select>
-                                                </div>
-                                                <div>
-                                                    <label className="text-xs font-medium text-muted-foreground">Output Column</label>
-                                                    <select
-                                                        className="w-full mt-1 h-9 rounded-md border border-input bg-background px-3 text-sm"
-                                                        value={masterConfig.overrideResultColumn ?? masterConfig.resultColumn?.index ?? ''}
-                                                        onChange={(e) => setMasterConfig(prev => prev ? {
-                                                            ...prev,
-                                                            overrideResultColumn: e.target.value ? parseInt(e.target.value) : undefined
-                                                        } : null)}
-                                                    >
-                                                        {masterConfig.headers?.map(h => (
-                                                            <option key={h.index} value={h.index}>{h.name}</option>
-                                                        ))}
-                                                        <option value={masterConfig.headers?.length || 0}>(New Column)</option>
-                                                    </select>
-                                                </div>
-                                            </div>
-                                        </CardContent>
-                                    </Card>
-                                )}
 
                                 {/* Run Button */}
-                                <div className="flex justify-end pt-4">
+                                <div className="flex justify-center pt-12 pb-8">
                                     <Button
                                         size="lg"
                                         disabled={!isReady || isProcessing}
                                         onClick={handleProcess}
-                                        className="min-w-40"
+                                        className={cn(
+                                            "min-w-96 transition-all font-bold text-3xl h-24 shadow-xl rounded-2xl",
+                                            isReady ? "bg-primary hover:bg-primary/90 animate-pulse-slow" : ""
+                                        )}
                                     >
                                         {isProcessing ? (
                                             <>
-                                                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                                <Loader2 className="w-10 h-10 mr-4 animate-spin" />
                                                 Processing...
                                             </>
                                         ) : (
-                                            <>
-                                                <Zap className="w-4 h-4 mr-2" />
-                                                Run Matching
-                                            </>
+                                            "Reconcile"
                                         )}
                                     </Button>
                                 </div>
@@ -1370,294 +1729,165 @@ export function MatcherWorkspace({ currentStep, onStepChange }: MatcherWorkspace
 
                         {/* Results Step */}
                         {currentStep === 'done' && (
-                            <div className="max-w-3xl mx-auto space-y-8">
-                                <div className="text-center space-y-4">
-                                    <div className="w-20 h-20 rounded-full bg-success flex items-center justify-center mx-auto">
-                                        <Check className="w-10 h-10 text-white" />
+                            <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+
+                                {/* 1. Hero Success Card */}
+                                <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-emerald-600 to-teal-700 text-white shadow-2xl">
+                                    <div className="absolute top-0 right-0 p-12 opacity-10">
+                                        <Check className="w-64 h-64" />
                                     </div>
-                                    <div>
-                                        <h1 className="text-2xl font-bold text-foreground">Matching Complete!</h1>
-                                        <p className="text-muted-foreground mt-2">Your master file has been updated.</p>
+                                    <div className="relative z-10 p-8 md:p-10">
+                                        <div className="flex flex-col md:flex-row justify-between gap-8 items-start md:items-center">
+                                            <div>
+                                                <div className="flex items-center gap-3">
+                                                    <div className="p-2 bg-white/20 rounded-full backdrop-blur-sm">
+                                                        <Check className="w-6 h-6 text-white" />
+                                                    </div>
+                                                    <h1 className="text-3xl font-bold text-white">
+                                                        Reconciliation Complete
+                                                    </h1>
+                                                </div>
+                                            </div>
+
+                                            {/* Key Metrics */}
+                                            {stats && executiveSummary && (
+                                                <div className="flex gap-6 bg-white/10 p-6 rounded-2xl backdrop-blur-sm border border-white/10">
+
+                                                    <div className="space-y-1">
+                                                        <p className="text-xs text-emerald-200 uppercase font-bold tracking-wider">Match Rate</p>
+                                                        <p className="text-3xl font-bold font-mono">
+                                                            {stats.matchPercentage}%
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
 
-                                {stats && (
-                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                        <Card className="text-center">
-                                            <CardContent className="pt-6">
-                                                <p className="text-3xl font-bold">{stats.totalMasterRows}</p>
-                                                <p className="text-xs text-muted-foreground uppercase mt-1">Rows Scanned</p>
-                                            </CardContent>
-                                        </Card>
-                                        <Card className="text-center bg-success/10 border-success/30">
-                                            <CardContent className="pt-6">
-                                                <p className="text-3xl font-bold text-success">{stats.matchedMasterRows}</p>
-                                                <p className="text-xs text-muted-foreground uppercase mt-1">Matches</p>
-                                            </CardContent>
-                                        </Card>
-                                        <Card className="text-center bg-destructive/10 border-destructive/30">
-                                            <CardContent className="pt-6">
-                                                <p className="text-3xl font-bold text-destructive">{stats.unmatchedMasterRows}</p>
-                                                <p className="text-xs text-muted-foreground uppercase mt-1">Unmatched</p>
-                                            </CardContent>
-                                        </Card>
-                                        <Card className="text-center bg-primary/10 border-primary/30">
-                                            <CardContent className="pt-6">
-                                                <p className="text-3xl font-bold text-primary">{stats.matchPercentage}%</p>
-                                                <p className="text-xs text-muted-foreground uppercase mt-1">Rate</p>
-                                            </CardContent>
-                                        </Card>
-                                    </div>
-                                )}
-
-                                {perFileStats && perFileStats.length > 0 && (
-                                    <Card>
-                                        <CardHeader>
-                                            <CardTitle className="text-sm">Per-File Results</CardTitle>
-                                        </CardHeader>
-                                        <CardContent className="space-y-3">
-                                            {perFileStats.map((fileStat, idx) => (
-                                                <div key={idx} className="space-y-1">
-                                                    <div className="flex items-center justify-between text-sm">
-                                                        <div className="flex flex-col">
-                                                            <span className="truncate font-medium">{fileStat.fileName}</span>
-                                                            <span className="text-xs text-muted-foreground">
-                                                                {fileStat.matched} / {fileStat.total} rows matched
-                                                            </span>
-                                                        </div>
-                                                        <Badge variant={fileStat.percentage >= 80 ? 'success' : fileStat.percentage >= 50 ? 'warning' : 'destructive'}>
-                                                            {fileStat.percentage}%
-                                                        </Badge>
-                                                    </div>
-                                                    <Progress value={fileStat.percentage} className={cn(
-                                                        fileStat.percentage >= 80 ? '[&>div]:bg-success' :
-                                                            fileStat.percentage >= 50 ? '[&>div]:bg-warning' : '[&>div]:bg-destructive'
-                                                    )} />
-                                                </div>
-                                            ))}
+                                {/* 2. Action Deck (What Now?) */}
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    {/* Primary Action: Invoicing */}
+                                    {/* Consolidated Action: Generate Documents */}
+                                    <Card className="col-span-1 md:col-span-2 border-primary/20 bg-gradient-to-br from-primary/5 to-transparent hover:border-primary/50 transition-all cursor-pointer group relative overflow-hidden">
+                                        <div className="absolute inset-0 bg-primary/5 translate-y-full group-hover:translate-y-0 transition-transform duration-300" />
+                                        <CardContent className="p-8 relative z-10 flex flex-col items-center text-center h-full">
+                                            <div className="p-4 bg-primary/10 text-primary rounded-2xl mb-6 group-hover:scale-110 transition-transform shadow-sm">
+                                                <Files className="w-10 h-10" />
+                                            </div>
+                                            <h3 className="text-3xl font-bold mb-3">Generate Documents</h3>
+                                            <p className="text-muted-foreground mb-8 max-w-lg text-lg">
+                                                Create official <strong>Invoices</strong> and the <strong>Executive Summary</strong> based on these reconciled figures.
+                                            </p>
+                                            <Button
+                                                size="lg"
+                                                className="w-full max-w-sm text-lg font-bold shadow-lg shadow-primary/20 h-12"
+                                                onClick={handlePrepareGeneration}
+                                                disabled={isGeneratingInvoices}
+                                            >
+                                                {isGeneratingInvoices ? (
+                                                    <>
+                                                        <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                                                        Generating...
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        Start Generation <ArrowRight className="ml-2 w-5 h-5" />
+                                                    </>
+                                                )}
+                                            </Button>
                                         </CardContent>
                                     </Card>
-                                )}
-
-                                {/* Unmatched Preview */}
-                                {unmatchedPath && stats && stats.unmatchedMasterRows > 0 && (
-                                    <Card>
-                                        <CardHeader>
-                                            <div className="flex items-center justify-between">
-                                                <CardTitle className="text-sm flex items-center gap-2">
-                                                    <AlertCircle className="w-4 h-4 text-destructive" />
-                                                    Unmatched Rows ({stats.unmatchedMasterRows})
-                                                </CardTitle>
-                                                <div className="flex items-center gap-2">
-                                                    <Button variant="outline" size="sm" onClick={() => setShowUnmatchedPreview(!showUnmatchedPreview)}>
-                                                        <Eye className="w-4 h-4 mr-1" />
-                                                        {showUnmatchedPreview ? 'Hide' : 'Preview'}
-                                                    </Button>
-                                                    <Button variant="outline" size="sm" onClick={handleOpenUnmatched}>
-                                                        <Download className="w-4 h-4 mr-1" />
-                                                        Open File
-                                                    </Button>
-                                                    <Button variant="ghost" size="sm" onClick={handleShowInFolder}>
-                                                        <ExternalLink className="w-4 h-4" />
-                                                    </Button>
-                                                </div>
-                                            </div>
-                                        </CardHeader>
-                                        {showUnmatchedPreview && unmatchedPreview && (
-                                            <CardContent>
-                                                <div className="border rounded-lg overflow-hidden">
-                                                    <div className="max-h-64 overflow-auto">
-                                                        <table className="w-full text-xs">
-                                                            <thead className="bg-secondary sticky top-0">
-                                                                <tr>
-                                                                    {unmatchedPreview[0]?.map((header: any, idx: number) => (
-                                                                        <th key={idx} className="px-2 py-1.5 text-left font-medium text-muted-foreground border-b">
-                                                                            {String(header || `Col ${idx + 1}`)}
-                                                                        </th>
-                                                                    ))}
-                                                                </tr>
-                                                            </thead>
-                                                            <tbody>
-                                                                {unmatchedPreview.slice(1).map((row, rIdx) => (
-                                                                    <tr key={rIdx} className="border-b last:border-0 hover:bg-secondary/50">
-                                                                        {row.map((cell: any, cIdx: number) => (
-                                                                            <td key={cIdx} className="px-2 py-1.5 font-mono truncate max-w-32">
-                                                                                {cell !== undefined && cell !== null ? String(cell) : ''}
-                                                                            </td>
-                                                                        ))}
-                                                                    </tr>
-                                                                ))}
-                                                            </tbody>
-                                                        </table>
-                                                    </div>
-                                                    {unmatchedPreview.length >= 50 && (
-                                                        <div className="px-3 py-2 bg-secondary/50 text-xs text-muted-foreground text-center">
-                                                            Showing first 50 rows. Open file for complete data.
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </CardContent>
-                                        )}
-                                    </Card>
-                                )}
-
-                                <div className="flex justify-center gap-4">
-                                    <Button size="lg" variant="outline" onClick={reset}>
-                                        <RefreshCw className="w-4 h-4 mr-2" />
-                                        New Match
-                                    </Button>
-                                    <Button size="lg" className="bg-gradient-to-r from-indigo-500 to-purple-600 border-0" onClick={() => setShowSummaryDialog(true)}>
-                                        <TrendingUp className="w-4 h-4 mr-2" />
-                                        Executive Summary
-                                    </Button>
                                 </div>
 
-                                {executiveSummary && (
-                                    <Card className="border-indigo-500/20 bg-indigo-500/5">
-                                        <CardHeader>
-                                            <div className="flex items-center justify-between">
-                                                <div className="space-y-1">
-                                                    <CardTitle className="text-xl flex items-center gap-2">
-                                                        <TrendingUp className="w-5 h-5 text-indigo-500" />
-                                                        Executive Summary
-                                                    </CardTitle>
-                                                    <CardDescription>Grouped by {outputFileHeaders.find(h => h.index === summaryColumnIndex)?.name}</CardDescription>
+                                {/* 3. Data Review & Downloads */}
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                    {/* Per-File Performance */}
+                                    {perFileStats && perFileStats.length > 0 && (
+                                        <Card className="md:col-span-3 bg-card/50">
+                                            <CardHeader className="pb-3">
+                                                <CardTitle className="text-lg flex items-center gap-2">
+                                                    <FileSpreadsheet className="w-5 h-5 text-muted-foreground" />
+                                                    File Performance
+                                                </CardTitle>
+                                            </CardHeader>
+                                            <CardContent>
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                                                    {perFileStats.map((file, idx) => {
+                                                        const config = targetConfigs.find(t => t.filePath === file.filePath);
+                                                        const displayName = config?.matchLabel || file.fileName;
+
+                                                        return (
+                                                            <div key={idx} className="bg-background border rounded-lg p-3 space-y-2">
+                                                                <div className="flex justify-between items-start">
+                                                                    <div className="space-y-0.5 max-w-[70%]">
+                                                                        <div className="font-medium text-sm truncate" title={file.fileName}>
+                                                                            {displayName}
+                                                                        </div>
+                                                                        <div className="text-xs text-muted-foreground">
+                                                                            {file.matched.toLocaleString()} / {file.total.toLocaleString()} rows
+                                                                        </div>
+                                                                    </div>
+                                                                    <Badge variant={file.percentage >= 90 ? 'success' : file.percentage >= 70 ? 'warning' : 'destructive'} className="ml-2">
+                                                                        {file.percentage}%
+                                                                    </Badge>
+                                                                </div>
+                                                                {/* Mini Progress Bar */}
+                                                                <div className="h-1.5 w-full bg-secondary rounded-full overflow-hidden">
+                                                                    <div
+                                                                        className={cn("h-full rounded-full",
+                                                                            file.percentage >= 90 ? "bg-success" :
+                                                                                file.percentage >= 70 ? "bg-warning" : "bg-destructive"
+                                                                        )}
+                                                                        style={{ width: `${file.percentage}%` }}
+                                                                    />
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    })}
                                                 </div>
-                                                <Button variant="outline" size="sm" onClick={handleExportSummary}>
-                                                    <Download className="w-4 h-4 mr-2" />
-                                                    Export to Excel
-                                                </Button>
-                                            </div>
+                                            </CardContent>
+                                        </Card>
+                                    )}
+
+                                    {/* Unmatched Review */}
+                                    <Card className="md:col-span-2 border-orange-200 dark:border-orange-900/50 bg-orange-50/50 dark:bg-orange-900/10">
+                                        <CardHeader className="pb-2">
+                                            <CardTitle className="text-lg flex items-center gap-2 text-orange-700 dark:text-orange-400">
+                                                <AlertCircle className="w-5 h-5" />
+                                                Review Needed
+                                                <Badge variant="outline" className="ml-auto border-orange-300 text-orange-700 bg-orange-100 dark:bg-orange-950 dark:text-orange-300">
+                                                    {stats?.unmatchedMasterRows || 0} Items
+                                                </Badge>
+                                            </CardTitle>
                                         </CardHeader>
                                         <CardContent>
-                                            <div className="rounded-md border bg-background overflow-x-auto">
-                                                <table className="w-full text-xs">
-                                                    <thead className="bg-secondary/50">
-                                                        <tr>
-                                                            <th className="px-2 py-2 text-left font-medium">Serial</th>
-                                                            <th className="px-2 py-2 text-left font-medium">Customer</th>
-                                                            <th className="px-2 py-2 text-right font-medium">Total Qty (MT)</th>
-                                                            <th className="px-2 py-2 text-right font-medium text-slate-500">10mm Qty</th>
-                                                            <th className="px-2 py-2 text-right font-medium text-primary">20mm Qty</th>
-                                                            <th className="px-2 py-2 text-right font-medium">10mm %</th>
-                                                            <th className="px-2 py-2 text-right font-medium">20mm %</th>
-                                                            <th className="px-2 py-2 text-right font-medium">10mm Trips</th>
-                                                            <th className="px-2 py-2 text-right font-medium">20mm Trips</th>
-                                                            <th className="px-2 py-2 text-right font-medium">Total Trips</th>
-                                                            <th className="px-2 py-2 text-left font-medium">Inv No</th>
-                                                            <th className="px-2 py-2 text-right font-medium text-amber-600">Excess 10mm</th>
-                                                            <th className="px-2 py-2 text-right font-medium text-green-600">Total Value</th>
-                                                        </tr>
-                                                    </thead>
-                                                    <tbody className="divide-y">
-                                                        {executiveSummary.map((sum, idx) => (
-                                                            <tr key={idx} className="hover:bg-secondary/20 transition-colors">
-                                                                <td className="px-2 py-2 text-muted-foreground">{idx + 1}</td>
-                                                                <td className="px-2 py-2 font-medium truncate max-w-[150px]">{sum.name}</td>
-                                                                <td className="px-2 py-2 text-right font-mono">{sum.totalQty.toLocaleString()}</td>
-                                                                <td className="px-2 py-2 text-right font-mono">{sum.total10mm.toLocaleString()}</td>
-                                                                <td className="px-2 py-2 text-right font-mono">{sum.total20mm.toLocaleString()}</td>
-                                                                <td className="px-2 py-2 text-right font-mono text-muted-foreground">{sum.percentage10mm}%</td>
-                                                                <td className="px-2 py-2 text-right font-mono text-muted-foreground">{sum.percentage20mm}%</td>
-                                                                <td className="px-2 py-2 text-right font-mono">{sum.trips10mm}</td>
-                                                                <td className="px-2 py-2 text-right font-mono">{sum.trips20mm}</td>
-                                                                <td className="px-2 py-2 text-right font-mono font-medium">{sum.trips10mm + sum.trips20mm}</td>
-                                                                <td className="px-2 py-2 text-muted-foreground">-</td>
-                                                                <td className="px-2 py-2 text-right font-mono text-amber-600">
-                                                                    {sum.excess10mm > 0 ? sum.excess10mm.toLocaleString() : '-'}
-                                                                </td>
-                                                                <td className="px-2 py-2 text-right font-mono font-bold text-green-600">
-                                                                    {sum.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                                                                </td>
-                                                            </tr>
-                                                        ))}
-                                                        {/* Totals Row */}
-                                                        <tr className="bg-secondary/30 font-bold text-xs">
-                                                            <td className="px-2 py-2"></td>
-                                                            <td className="px-2 py-2">GRAND TOTAL</td>
-                                                            <td className="px-2 py-2 text-right">{executiveSummary.reduce((acc, s) => acc + s.totalQty, 0).toLocaleString()}</td>
-                                                            <td className="px-2 py-2 text-right">{executiveSummary.reduce((acc, s) => acc + s.total10mm, 0).toLocaleString()}</td>
-                                                            <td className="px-2 py-2 text-right">{executiveSummary.reduce((acc, s) => acc + s.total20mm, 0).toLocaleString()}</td>
-                                                            <td className="px-2 py-2" colSpan={2}></td>
-                                                            <td className="px-2 py-2 text-right">{executiveSummary.reduce((acc, s) => acc + s.trips10mm, 0)}</td>
-                                                            <td className="px-2 py-2 text-right">{executiveSummary.reduce((acc, s) => acc + s.trips20mm, 0)}</td>
-                                                            <td className="px-2 py-2 text-right">{executiveSummary.reduce((acc, s) => acc + (s.trips10mm + s.trips20mm), 0)}</td>
-                                                            <td className="px-2 py-2"></td>
-                                                            <td className="px-2 py-2 text-right text-amber-600">
-                                                                {executiveSummary.reduce((acc, s) => acc + s.excess10mm, 0).toLocaleString()}
-                                                            </td>
-                                                            <td className="px-2 py-2 text-right text-green-600">
-                                                                {executiveSummary.reduce((acc, s) => acc + s.totalAmount, 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                                                            </td>
-                                                        </tr>
-                                                    </tbody>
-                                                </table>
-                                            </div>
+                                            <p className="text-sm text-muted-foreground mb-4">
+                                                Some rows in the master file couldn't be automatically matched.
+                                            </p>
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                className="border-orange-200 hover:bg-orange-100 hover:text-orange-800 dark:border-orange-800 dark:hover:bg-orange-900"
+                                                onClick={handleOpenUnmatched}
+                                            >
+                                                <ExternalLink className="w-4 h-4 mr-2" />
+                                                Download Unmatched Results
+                                            </Button>
                                         </CardContent>
                                     </Card>
-                                )}
+
+
+                                    {/* Executive Summary removed - auto-download instead */}
+                                </div>
+
+
                             </div>
                         )}
-
-                        <GlassDialog
-                            isOpen={showSummaryDialog}
-                            onClose={() => setShowSummaryDialog(false)}
-                            title="Generate Executive Summary"
-                            description="Select the customer column and verify rates to generate a report."
-                        >
-                            <div className="space-y-4 py-4">
-                                <div className="space-y-2">
-                                    <label className="text-sm font-medium">Customer Column</label>
-                                    <select
-                                        className="w-full h-10 rounded-md border border-input bg-background/50 px-3 text-sm focus:border-primary"
-                                        value={summaryColumnIndex}
-                                        onChange={(e) => setSummaryColumnIndex(parseInt(e.target.value))}
-                                    >
-                                        <option value={-1}>Select column...</option>
-                                        {outputFileHeaders.map(h => (
-                                            <option key={h.index} value={h.index}>{h.name}</option>
-                                        ))}
-                                    </select>
-                                </div>
-
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="space-y-2">
-                                        <label className="text-sm font-medium">10mm Rate</label>
-                                        <div className="relative">
-                                            <DollarSign className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                                            <Input
-                                                type="number"
-                                                className="pl-9"
-                                                value={summaryRate10}
-                                                onChange={(e) => setSummaryRate10(e.target.value)}
-                                            />
-                                        </div>
-                                    </div>
-                                    <div className="space-y-2">
-                                        <label className="text-sm font-medium">20mm Rate</label>
-                                        <div className="relative">
-                                            <DollarSign className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                                            <Input
-                                                type="number"
-                                                className="pl-9"
-                                                value={summaryRate20}
-                                                onChange={(e) => setSummaryRate20(e.target.value)}
-                                            />
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div className="flex justify-end pt-4">
-                                    <Button onClick={handleGenerateSummary} disabled={summaryColumnIndex === -1}>
-                                        <FileText className="w-4 h-4 mr-2" />
-                                        Generate Report
-                                    </Button>
-                                </div>
-                            </div>
-                        </GlassDialog>
                     </div>
                 </ScrollArea>
             </main>
         </div>
     );
 }
+

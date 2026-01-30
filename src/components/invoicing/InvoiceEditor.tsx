@@ -2,9 +2,11 @@ import { useState, useEffect } from 'react';
 import type { Invoice, Customer, BankingDetails } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card } from '@/components/ui/card';
 import { Save, Trash2, Printer, Receipt } from 'lucide-react';
 import { calculateAmount, calculateSubtotal } from '@/utils/calculations';
+import { InvoiceIssueDialog } from './InvoiceIssueDialog';
+import { cn } from '@/lib/utils';
+import { Badge } from '@/components/ui/badge';
 
 
 interface InvoiceEditorProps {
@@ -16,9 +18,17 @@ interface InvoiceEditorProps {
 }
 
 export function InvoiceEditor({ invoice: initialInvoice, onSave, onDelete, onGeneratePDF }: InvoiceEditorProps) {
-    const [invoice, setInvoice] = useState<Invoice>(initialInvoice);
+    const [invoice, setInvoice] = useState<Invoice>(() => ({
+        ...initialInvoice,
+        items: initialInvoice.items.map(item => ({
+            ...item,
+            quantity: Math.round(item.quantity * 100) / 100,
+            amount: Math.round(item.amount * 100) / 100
+        }))
+    }));
     const [customers, setCustomers] = useState<Customer[]>([]);
     const [bankingDetails, setBankingDetails] = useState<BankingDetails | null>(null);
+    const [showIssueDialog, setShowIssueDialog] = useState(false);
 
     useEffect(() => {
         // Sanitize and Consolidate Items on Load
@@ -132,281 +142,414 @@ export function InvoiceEditor({ invoice: initialInvoice, onSave, onDelete, onGen
 
 
 
+    // Layout: Strict WYSIWYG (Exact match to InvoicePrintView)
     return (
-        <div className="w-full max-w-[1200px] relative mx-auto pb-48 pt-6">
-            {/* Action Bar (Floating) */}
-            <div className="fixed bottom-8 right-8 flex items-center gap-2 z-50 p-2 bg-background/80 backdrop-blur-md rounded-full shadow-2xl border border-white/10 print:hidden transition-all hover:scale-105">
-                {invoice.id && (
-                    <>
-                        <Button variant="ghost" size="icon" onClick={onDelete} className="rounded-full w-10 h-10 hover:bg-red-500/20 hover:text-red-400 text-muted-foreground/70 hover:text-red-500">
-                            <Trash2 className="w-4 h-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon" onClick={() => onGeneratePDF(invoice)} className="rounded-full w-10 h-10 hover:bg-blue-500/20 hover:text-blue-400 text-muted-foreground/70 hover:text-blue-500">
-                            <Printer className="w-4 h-4" />
-                        </Button>
-                        <div className="w-[1px] h-4 bg-white/10 mx-1" />
-                    </>
-                )}
-                {invoice.status === 'draft' && (
-                    <Button
-                        onClick={() => {
-                            if (window.confirm("Mark as ISSUED and download PDF?\n\nThis will assume the invoice is finalized.")) {
-                                const issuedInvoice = {
-                                    ...invoice,
-                                    status: 'issued' as const,
-                                    date: new Date().toISOString().split('T')[0] // Set date to today on issue
-                                };
-                                setInvoice(issuedInvoice);
-                                onSave(issuedInvoice);
-                                onGeneratePDF(issuedInvoice);
-                            }
-                        }}
-                        className="rounded-full px-6 bg-emerald-500 hover:bg-emerald-600 text-white font-bold shadow-lg shadow-emerald-500/20 mr-2"
-                    >
-                        <Receipt className="w-4 h-4 mr-2" /> Issue & Print
+        <div className="w-full h-full flex flex-col items-center bg-gray-100/50 overflow-y-auto relative pb-20">
+
+            {/* Floating Action Toolbar */}
+            <div className="sticky top-6 z-50 flex items-center justify-between gap-4 bg-white/80 backdrop-blur-md px-6 py-2 rounded-full shadow-lg border border-black/5 mb-8 print:hidden">
+                <div className="flex items-center gap-3 pr-4 border-r border-black/5">
+                    <span className="font-bold text-sm text-foreground">
+                        {invoice.number === 'DRAFT' ? 'New Invoice' : invoice.number}
+                    </span>
+                    <Badge variant={invoice.status === 'paid' ? 'default' : 'secondary'} className="uppercase text-[10px] h-5">
+                        {invoice.status}
+                    </Badge>
+                </div>
+
+                <div className="flex items-center gap-2">
+                    {invoice.id && (
+                        <>
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                    if (confirm('Are you sure you want to delete this invoice?')) onDelete();
+                                }}
+                                className="h-8 text-muted-foreground hover:text-red-500 hover:bg-red-50"
+                            >
+                                <Trash2 className="w-3.5 h-3.5 mr-1.5" /> Delete
+                            </Button>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => onGeneratePDF(invoice)}
+                                className="h-8"
+                            >
+                                <Printer className="w-3.5 h-3.5 mr-1.5" /> PDF
+                            </Button>
+                        </>
+                    )}
+
+                    <Button onClick={handleSave} variant="default" size="sm" className="h-8 shadow-sm">
+                        <Save className="w-3.5 h-3.5 mr-1.5" /> Save
                     </Button>
-                )}
-                <Button onClick={handleSave} className="rounded-full px-6 font-bold shadow-lg shadow-primary/20">
-                    <Save className="w-4 h-4 mr-2" /> Save Changes
-                </Button>
+
+                    {invoice.status === 'draft' && (
+                        <Button
+                            onClick={() => setShowIssueDialog(true)}
+                            className="bg-emerald-600 hover:bg-emerald-700 text-white h-8 shadow-sm"
+                            size="sm"
+                        >
+                            <Receipt className="w-3.5 h-3.5 mr-1.5" /> Issue
+                        </Button>
+                    )}
+                </div>
             </div>
 
-            {/* Main Editor Card */}
-            <Card className="min-h-[1100px] w-full bg-card/40 backdrop-blur-md border-white/5 shadow-2xl overflow-hidden rounded-xl print:shadow-none print:bg-white print:border-none">
-                {/* Header Decoration */}
-                <div className="h-2 w-full bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 opacity-70" />
+            {/* A4 Paper Canvas (Exact styles from PrintView) */}
+            <div
+                style={{
+                    width: '210mm',
+                    minHeight: '297mm',
+                    backgroundColor: '#ffffff',
+                    fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif',
+                    color: '#1d1d1f',
+                    boxSizing: 'border-box',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    position: 'relative',
+                    boxShadow: '0 20px 50px -12px rgba(0, 0, 0, 0.25)'
+                }}
+                className="print:shadow-none print:m-0"
+            >
+                {/* Header Image */}
+                <div style={{ width: '100%', flexShrink: 0 }}>
+                    <img src="/src/assets/images/invoice-header.png" alt="Header" style={{ width: '100%', height: 'auto', display: 'block' }} />
+                </div>
 
-                <div className="p-12 space-y-12 pb-32">
-                    {/* Top Header: Brand & Invoice Info */}
-                    <div className="flex justify-between items-start">
-                        {/* Brand */}
-                        <div className="space-y-4">
-                            <div className="flex items-center gap-3">
-                                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary to-indigo-600 flex items-center justify-center shadow-lg shadow-primary/20 ring-1 ring-white/10">
-                                    <span className="text-white font-bold text-2xl">F</span>
-                                </div>
-                                <div>
-                                    <h1 className="font-bold text-2xl tracking-tight text-foreground">FATOORA</h1>
-                                    <p className="text-xs text-muted-foreground font-medium tracking-widest uppercase">Enterprise Edition</p>
-                                </div>
+                {/* Content Body */}
+                <div style={{ flex: 1, padding: '24px 40px', display: 'flex', flexDirection: 'column' }}>
+
+                    {/* Invoice Details Grid */}
+                    <div style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(3, 1fr)',
+                        gap: '12px 24px',
+                        marginBottom: '24px',
+                        paddingBottom: '16px',
+                        borderBottom: '1px solid #e5e5e5'
+                    }}>
+                        {/* Invoice No */}
+                        <div>
+                            <div style={{ fontSize: '10px', fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', color: '#86868b', marginBottom: '3px' }}>
+                                Invoice No.
+                            </div>
+                            <div style={{ fontSize: '14px', fontWeight: 600, color: '#1d1d1f' }}>
+                                {invoice.number === 'DRAFT' ? '---' : invoice.number}
                             </div>
                         </div>
 
-                        {/* Invoice Meta */}
-                        <div className="text-right space-y-4">
-                            <div>
-                                <h2 className="text-4xl font-black text-black tracking-tight select-none">INVOICE</h2>
-                                <div className="flex items-center justify-end gap-3 relative z-10">
-                                    <span className="text-sm font-medium text-muted-foreground">#</span>
-                                    <Input
-                                        value={invoice.number === 'DRAFT' ? 'Auto-Generated' : invoice.number}
-                                        readOnly
-                                        className="w-40 text-right font-mono text-xl font-bold bg-transparent border-none focus-visible:ring-0 p-0 h-auto placeholder:text-muted-foreground/30 text-foreground cursor-not-allowed opacity-70"
-                                        placeholder="Auto-Generated"
-                                    />
-                                </div>
+                        {/* Date */}
+                        <div>
+                            <div style={{ fontSize: '9px', fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', color: '#86868b', marginBottom: '3px' }}>
+                                Date
                             </div>
-                            <div className="flex gap-2 justify-end">
-                                {['draft', 'issued', 'paid', 'overdue'].map((s) => (
-                                    <button
-                                        key={s}
-                                        onClick={() => handleChange('status', s)}
-                                        className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider transition-all border ${invoice.status === s
-                                            ? s === 'paid' ? 'bg-emerald-500/20 text-emerald-500 border-emerald-500/30'
-                                                : s === 'issued' ? 'bg-blue-500/20 text-blue-500 border-blue-500/30'
-                                                    : s === 'overdue' ? 'bg-red-500/20 text-red-500 border-red-500/30'
-                                                        : 'bg-white/10 text-foreground border-white/10'
-                                            : 'text-muted-foreground border-transparent hover:bg-white/5'
-                                            }`}
-                                    >
-                                        {s}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Dates & Reference Bar */}
-                    <div className="grid grid-cols-3 gap-6 p-6 rounded-xl bg-white/5 border border-white/5">
-                        <div className="space-y-2">
-                            <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Date Issued</label>
                             <Input
                                 type="date"
-                                value={invoice.date}
-                                onChange={(e) => handleChange('date', e.target.value)}
-                                className="bg-white/5 border-white/10 focus:bg-white/10 h-10 transition-all font-medium"
+                                value={invoice.date.split('T')[0]}
+                                onChange={(e) => handleChange('date', new Date(e.target.value).toISOString())}
+                                className="p-1 h-auto border-none bg-transparent hover:bg-blue-50/50 hover:text-blue-700 focus:bg-white focus:ring-2 focus:ring-blue-500/10 focus:shadow-md transition-all duration-200 -mx-1 rounded-md w-full cursor-pointer"
+                                style={{ fontSize: '13px', color: '#1d1d1f', fontFamily: 'inherit' }}
                             />
                         </div>
-                        <div className="space-y-2">
-                            <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Due Date</label>
+
+                        {/* Due Date */}
+                        <div>
+                            <div style={{ fontSize: '9px', fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', color: '#86868b', marginBottom: '3px' }}>
+                                Due Date
+                            </div>
                             <Input
                                 type="date"
-                                value={invoice.dueDate || ''}
-                                onChange={(e) => handleChange('dueDate', e.target.value)}
-                                className="bg-white/5 border-white/10 focus:bg-white/10 h-10 transition-all font-medium"
+                                value={invoice.dueDate ? invoice.dueDate.split('T')[0] : ''}
+                                onChange={(e) => handleChange('dueDate', new Date(e.target.value).toISOString())}
+                                className="p-1 h-auto border-none bg-transparent hover:bg-blue-50/50 hover:text-blue-700 focus:bg-white focus:ring-2 focus:ring-blue-500/10 focus:shadow-md transition-all duration-200 -mx-1 rounded-md w-full cursor-pointer"
+                                style={{ fontSize: '13px', color: '#1d1d1f', fontFamily: 'inherit' }}
                             />
                         </div>
-                        <div className="hidden md:block"></div> {/* Spacer to fill row if needed, or just let it wrap naturally */}
 
-                        <div className="space-y-2">
-                            <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">LPO Number</label>
+                        {/* LPO No */}
+                        <div>
+                            <div style={{ fontSize: '9px', fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', color: '#86868b', marginBottom: '3px' }}>
+                                LPO No.
+                            </div>
                             <Input
                                 value={invoice.lpoNo || ''}
                                 onChange={(e) => handleChange('lpoNo', e.target.value)}
-                                className="bg-white/5 border-white/10 focus:bg-white/10 h-10 transition-all placeholder:text-muted-foreground/30"
-                                placeholder="Optional"
+                                className="p-1 h-auto border-none bg-transparent hover:bg-blue-50/50 hover:text-blue-700 focus:bg-white focus:text-black focus:ring-2 focus:ring-blue-500/10 focus:shadow-md transition-all duration-200 -mx-1 rounded-md w-full placeholder:text-gray-300 cursor-text"
+                                placeholder="-"
+                                style={{ fontSize: '13px', color: '#1d1d1f', fontFamily: 'inherit' }}
                             />
                         </div>
-                        <div className="space-y-2">
-                            <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">LPO Date</label>
+
+                        {/* LPO Date */}
+                        <div>
+                            <div style={{ fontSize: '9px', fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', color: '#86868b', marginBottom: '3px' }}>
+                                LPO Date
+                            </div>
                             <Input
                                 type="date"
-                                value={invoice.lpoDate || ''}
+                                value={invoice.lpoDate ? invoice.lpoDate.split('T')[0] : ''}
                                 onChange={(e) => handleChange('lpoDate', e.target.value)}
-                                className="bg-white/5 border-white/10 focus:bg-white/10 h-10 transition-all font-medium"
+                                className="p-1 h-auto border-none bg-transparent hover:bg-blue-50/50 hover:text-blue-700 focus:bg-white focus:text-black focus:ring-2 focus:ring-blue-500/10 focus:shadow-md transition-all duration-200 -mx-1 rounded-md w-full text-gray-500 focus:text-black cursor-pointer"
+                                style={{ fontSize: '13px', fontFamily: 'inherit' }}
                             />
                         </div>
-                        <div className="hidden md:block"></div>
 
-                        <div className="space-y-2">
-                            <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Commercial Offer Ref</label>
+                        {/* Commercial Offer Ref */}
+                        <div>
+                            <div style={{ fontSize: '9px', fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', color: '#86868b', marginBottom: '3px' }}>
+                                Commercial Offer Ref
+                            </div>
                             <Input
                                 value={invoice.commercialOfferRef || ''}
                                 onChange={(e) => handleChange('commercialOfferRef', e.target.value)}
-                                className="bg-white/5 border-white/10 focus:bg-white/10 h-10 transition-all placeholder:text-muted-foreground/30"
-                                placeholder="Optional"
+                                className="p-1 h-auto border-none bg-transparent hover:bg-blue-50/50 hover:text-blue-700 focus:bg-white focus:text-black focus:ring-2 focus:ring-blue-500/10 focus:shadow-md transition-all duration-200 -mx-1 rounded-md w-full placeholder:text-gray-300 cursor-text"
+                                placeholder="-"
+                                style={{ fontSize: '13px', color: '#1d1d1f', fontFamily: 'inherit' }}
                             />
                         </div>
-                        <div className="space-y-2">
-                            <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Commercial Offer Date</label>
+
+                        {/* Commercial Offer Date */}
+                        <div>
+                            <div style={{ fontSize: '9px', fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', color: '#86868b', marginBottom: '3px' }}>
+                                Commercial Offer Date
+                            </div>
                             <Input
                                 type="date"
-                                value={invoice.commercialOfferDate || ''}
+                                value={invoice.commercialOfferDate ? invoice.commercialOfferDate.split('T')[0] : ''}
                                 onChange={(e) => handleChange('commercialOfferDate', e.target.value)}
-                                className="bg-white/5 border-white/10 focus:bg-white/10 h-10 transition-all font-medium"
+                                className="p-1 h-auto border-none bg-transparent hover:bg-blue-50/50 hover:text-blue-700 focus:bg-white focus:text-black focus:ring-2 focus:ring-blue-500/10 focus:shadow-md transition-all duration-200 -mx-1 rounded-md w-full text-gray-500 focus:text-black cursor-pointer"
+                                style={{ fontSize: '13px', fontFamily: 'inherit' }}
                             />
                         </div>
                     </div>
 
-                    {/* Payment Info */}
-                    <div className="mb-12">
-                        <div className="space-y-4">
-                            <h3 className="text-sm font-bold text-muted-foreground uppercase tracking-wider">Payment Details</h3>
-                            <div className="p-8 rounded-xl bg-white/5 border border-white/5 space-y-6 w-full">
-                                <div className="space-y-3">
-                                    <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Payment Terms</label>
+                    {/* Main Content Split */}
+                    <div style={{ display: 'grid', gridTemplateColumns: '3fr 2fr', gap: '32px', marginBottom: '32px' }}>
 
-                                    <textarea
-                                        value={invoice.paymentTerms || ''}
-                                        onChange={(e) => handleChange('paymentTerms', e.target.value)}
-                                        className="w-full bg-white/5 border border-white/10 rounded-md focus:bg-white/10 focus:border-primary/50 text-lg transition-all p-3 min-h-[80px] resize-none focus:outline-none focus:ring-1 focus:ring-primary/50"
-                                        placeholder="e.g. Net 30, Due on Receipt"
-                                    />
+                        {/* Left: Banking & Terms */}
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '20px' }}>
+                            {/* Payment Terms */}
+                            <div>
+                                <div style={{ fontSize: '11px', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#86868b', marginBottom: '4px' }}>
+                                    Payment Terms
                                 </div>
-                                {bankingDetails && (
-                                    <div className="pt-6 border-t border-white/5 space-y-3">
-                                        <div className="text-base font-bold text-foreground">{bankingDetails.beneficiaryName}</div>
-                                        <div className="text-sm text-muted-foreground space-y-1">
-                                            <div className="font-medium text-foreground/80">{bankingDetails.beneficiaryBank}</div>
-                                            <div><span className="opacity-50">Branch:</span> {bankingDetails.branch}</div>
-                                            <div className="font-mono mt-2 text-base"><span className="opacity-50">IBAN:</span> {bankingDetails.ibanNo}</div>
-                                            <div className="font-mono"><span className="opacity-50">SWIFT:</span> {bankingDetails.swiftCode}</div>
-                                        </div>
+                                <Input
+                                    value={invoice.paymentTerms || ''}
+                                    onChange={(e) => handleChange('paymentTerms', e.target.value)}
+                                    className="p-1 h-auto border-none bg-transparent hover:bg-blue-50/50 hover:text-blue-700 focus:bg-white focus:text-black focus:ring-2 focus:ring-blue-500/10 focus:shadow-md transition-all duration-200 -mx-1 rounded-md w-full cursor-text"
+                                    placeholder="Payment due within 30 days."
+                                    style={{ fontSize: '14px', color: '#6e6e73', lineHeight: 1.4, fontFamily: 'inherit' }}
+                                />
+                            </div>
+
+                            {/* Banking Details */}
+                            {bankingDetails && (
+                                <div style={{ marginTop: '12px' }}>
+                                    <div style={{ fontSize: '13px', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#86868b', marginBottom: '8px' }}>
+                                        Beneficiary Details
+                                    </div>
+                                    <div style={{ fontSize: '14px', color: '#666', lineHeight: 1.6, display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '4px 10px' }}>
+                                        <span style={{ fontWeight: 500, color: '#333' }}>Beneficiary:</span> <span>{bankingDetails.beneficiaryName}</span>
+                                        <span style={{ fontWeight: 500, color: '#333' }}>Bank:</span> <span>{bankingDetails.beneficiaryBank}</span>
+                                        <span style={{ fontWeight: 500, color: '#333' }}>Branch:</span> <span>{bankingDetails.branch}</span>
+                                        <span style={{ fontWeight: 500, color: '#333' }}>IBAN:</span> <span style={{ fontFamily: 'monospace', fontSize: '15px' }}>{bankingDetails.ibanNo}</span>
+                                        <span style={{ fontWeight: 500, color: '#333' }}>SWIFT:</span> <span style={{ fontFamily: 'monospace', fontSize: '15px' }}>{bankingDetails.swiftCode}</span>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Right: Bill To */}
+                        <div style={{ paddingLeft: '20px', borderLeft: '1px solid #eee' }}>
+                            <div style={{ fontSize: '11px', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#86868b', marginBottom: '8px' }}>
+                                Billed To
+                            </div>
+                            <div style={{ marginBottom: '4px', fontSize: '15px', fontWeight: 700, color: '#1d1d1f' }}>
+                                {invoice.to.name || 'Select Customer...'}
+                            </div>
+                            <div style={{ lineHeight: 1.5, fontSize: '13px', color: '#6e6e73' }}>
+                                <div>{invoice.to.address || 'No Address'}</div>
+                                {invoice.to.phone && (
+                                    <div className="flex items-center gap-1">
+                                        <span>Tel:</span>
+                                        <span>{invoice.to.phone}</span>
                                     </div>
                                 )}
                             </div>
                         </div>
                     </div>
 
-                    {/* Items Table */}
-                    <div className="space-y-4">
-                        <div className="grid grid-cols-12 gap-4 px-4 py-2 text-[10px] font-bold text-muted-foreground uppercase tracking-widest border-b border-white/10">
-                            <div className="col-span-4">Description</div>
-                            <div className="col-span-3 text-right">Qty</div>
-                            <div className="col-span-2 text-right">Price</div>
-                            <div className="col-span-3 text-right">Amount</div>
-                        </div>
+                    {/* Items Table Description */}
+                    <div style={{ marginBottom: '16px' }}>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
+                            <thead>
+                                <tr style={{ backgroundColor: '#f5f5f7' }}>
+                                    <th style={{ textAlign: 'left', padding: '10px 8px', fontSize: '10px', fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', color: '#86868b', width: '120px', borderBottom: '1px solid #d2d2d7' }}>
+                                        Description
+                                    </th>
+                                    <th style={{ textAlign: 'right', padding: '10px 8px', fontSize: '10px', fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', color: '#86868b', width: '100px', borderBottom: '1px solid #d2d2d7' }}>
+                                        Qty (Tons)
+                                    </th>
+                                    <th style={{ textAlign: 'right', padding: '10px 8px', fontSize: '10px', fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', color: '#86868b', width: '60px', borderBottom: '1px solid #d2d2d7' }}>
+                                        Mix %
+                                    </th>
+                                    <th style={{ textAlign: 'right', padding: '10px 8px', fontSize: '10px', fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', color: '#86868b', width: '90px', borderBottom: '1px solid #d2d2d7' }}>
+                                        Rate
+                                    </th>
+                                    <th style={{ textAlign: 'right', padding: '10px 8px', fontSize: '10px', fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', color: '#86868b', width: '100px', borderBottom: '1px solid #d2d2d7' }}>
+                                        Amount
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {invoice.items.map((item, index) => {
+                                    const isExcess = item.description.includes('Excess');
+                                    const totalQty = invoice.items.reduce((acc, i) => acc + i.quantity, 0);
 
-                        <div className="space-y-2">
-                            {invoice.items.map((item, index) => (
-                                <div key={item.id} className="grid grid-cols-12 gap-4 items-center group px-4 py-3 rounded-lg hover:bg-white/5 transition-colors border border-transparent hover:border-white/5">
-                                    <div className="col-span-4 relative">
-                                        <Input
-                                            value={item.description}
-                                            onChange={(e) => {
-                                                const newItems = [...invoice.items];
-                                                newItems[index] = { ...item, description: e.target.value };
-                                                setInvoice(recalculateTotals({ ...invoice, items: newItems }));
-                                            }}
-                                            className={`bg-white/5 border-transparent hover:border-white/10 focus:border-primary/50 focus:bg-white/10 h-10 px-3 transition-all font-medium ${item.description.includes('Excess') ? 'text-red-400' : 'text-foreground'}`}
-                                            placeholder="Item description"
-                                        />
-                                        {item.description.includes('Excess') && (
-                                            <span className="text-[10px] text-red-500 font-bold uppercase tracking-wider absolute -bottom-3 left-0">Penalty Rate</span>
-                                        )}
-                                    </div>
-                                    <div className="col-span-3">
-                                        <Input
-                                            type="number"
-                                            value={item.quantity}
-                                            onChange={(e) => {
-                                                const val = parseFloat(e.target.value) || 0;
-                                                const newItems = [...invoice.items];
-                                                const amount = Math.round(val * item.unitPrice * 100) / 100;
-                                                newItems[index] = { ...item, quantity: val, amount };
-                                                setInvoice(recalculateTotals({ ...invoice, items: newItems }));
-                                            }}
-                                            className="text-right bg-white/5 border-transparent hover:border-white/10 focus:border-primary/50 focus:bg-white/10 h-10 px-3 font-mono text-muted-foreground focus:text-foreground transition-all"
-                                            step="any"
-                                        />
-                                    </div>
-                                    <div className="col-span-2">
-                                        <Input
-                                            type="number"
-                                            value={item.unitPrice}
-                                            onChange={(e) => {
-                                                const val = parseFloat(e.target.value) || 0;
-                                                const newItems = [...invoice.items];
-                                                const amount = Math.round(item.quantity * val * 100) / 100;
-                                                newItems[index] = { ...item, unitPrice: val, amount };
-                                                setInvoice(recalculateTotals({ ...invoice, items: newItems }));
-                                            }}
-                                            className="text-right bg-white/5 border-transparent hover:border-white/10 focus:border-primary/50 focus:bg-white/10 h-10 px-3 font-mono text-muted-foreground focus:text-foreground transition-all"
-                                            step="any"
-                                        />
-                                    </div>
-                                    <div className="col-span-3 flex items-center justify-end gap-3 text-right">
-                                        <span className="font-mono font-medium text-lg">
-                                            {new Intl.NumberFormat('en-US', { style: 'currency', currency: invoice.currency }).format(item.amount)}
-                                        </span>
-                                        <button
-                                            onClick={() => {
-                                                const newItems = invoice.items.filter((_, i) => i !== index);
-                                                setInvoice(recalculateTotals({ ...invoice, items: newItems }));
-                                            }}
-                                            className="opacity-0 group-hover:opacity-100 p-2 rounded-md hover:bg-red-500/10 text-muted-foreground hover:text-red-500 transition-all"
-                                        >
-                                            <Trash2 className="w-4 h-4" />
-                                        </button>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
+                                    return (
+                                        <tr key={item.id || index} className="group hover:bg-gray-50 transition-colors">
+                                            <td style={{ padding: '8px 8px', borderBottom: '1px solid #e8e8ed', position: 'relative' }}>
+                                                <div className="flex items-center gap-2">
+                                                    <Input
+                                                        value={item.description}
+                                                        onChange={(e) => {
+                                                            const newItems = [...invoice.items];
+                                                            newItems[index] = { ...item, description: e.target.value };
+                                                            setInvoice(recalculateTotals({ ...invoice, items: newItems }));
+                                                        }}
+                                                        className={cn(
+                                                            "p-1 h-auto border-none bg-transparent",
+                                                            "hover:bg-blue-50/50 hover:text-blue-700 hover:shadow-sm",
+                                                            "focus:bg-white focus:text-black focus:ring-2 focus:ring-blue-500/10 focus:shadow-md focus:scale-[1.01]",
+                                                            "transition-all duration-200 ease-out -mx-1 rounded-md w-full font-medium cursor-text",
+                                                            isExcess ? "text-orange-600" : "text-[#1d1d1f]"
+                                                        )}
+                                                        style={{ fontSize: '12px', fontFamily: 'inherit' }}
+                                                    />
+
+                                                    {/* Hover Controls */}
+                                                    <div className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 flex items-center gap-1 bg-white shadow-sm border rounded px-1">
+                                                        <button
+                                                            onClick={() => {
+                                                                const newItems = invoice.items.filter((_, i) => i !== index);
+                                                                setInvoice(recalculateTotals({ ...invoice, items: newItems }));
+                                                            }}
+                                                            className="p-1 hover:text-red-500 text-gray-400"
+                                                            title="Delete"
+                                                        >
+                                                            <Trash2 className="w-3 h-3" />
+                                                        </button>
+                                                        <div className="h-3 w-px bg-gray-200" />
+                                                        <button
+                                                            onClick={() => {
+                                                                const newItems = [...invoice.items];
+                                                                let newDesc = item.description;
+                                                                if (!newDesc.includes('Excess')) {
+                                                                    newDesc += ' Excess';
+                                                                } else {
+                                                                    newDesc = newDesc.replace(/Excess/g, '').trim();
+                                                                }
+                                                                newItems[index] = { ...item, description: newDesc };
+                                                                setInvoice(recalculateTotals({ ...invoice, items: newItems }));
+                                                            }}
+                                                            className={cn(
+                                                                "p-1 text-[9px] font-bold uppercase tracking-wider",
+                                                                isExcess ? "text-orange-500" : "text-gray-400 hover:text-orange-500"
+                                                            )}
+                                                            title="Toggle Penalty"
+                                                        >
+                                                            {isExcess ? 'Penalty On' : 'Penalty'}
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td style={{ padding: '8px 8px', textAlign: 'right', borderBottom: '1px solid #e8e8ed' }}>
+                                                <Input
+                                                    type="number"
+                                                    value={item.quantity}
+                                                    onChange={(e) => {
+                                                        const val = parseFloat(e.target.value) || 0;
+                                                        const newItems = [...invoice.items];
+                                                        const amount = Math.round(val * item.unitPrice * 100) / 100;
+                                                        newItems[index] = { ...item, quantity: val, amount };
+                                                        setInvoice(recalculateTotals({ ...invoice, items: newItems }));
+                                                    }}
+                                                    className="p-1 h-auto border-none bg-transparent hover:bg-blue-50/50 hover:text-blue-700 focus:bg-white focus:text-black focus:ring-2 focus:ring-blue-500/10 focus:shadow-md transition-all duration-200 -mx-1 rounded-md text-right w-full cursor-text"
+                                                    style={{ fontSize: '12px', color: '#6e6e73', fontFamily: 'inherit', fontVariantNumeric: 'tabular-nums' }}
+                                                />
+                                            </td>
+                                            <td style={{ padding: '8px 8px', textAlign: 'right', color: '#6e6e73', borderBottom: '1px solid #e8e8ed', fontSize: '12px', fontVariantNumeric: 'tabular-nums' }}>
+                                                {totalQty > 0 ? ((item.quantity / totalQty) * 100).toFixed(1) + '%' : '-'}
+                                            </td>
+                                            <td style={{ padding: '8px 8px', textAlign: 'right', borderBottom: '1px solid #e8e8ed' }}>
+                                                <Input
+                                                    type="number"
+                                                    value={item.unitPrice}
+                                                    onChange={(e) => {
+                                                        const val = parseFloat(e.target.value) || 0;
+                                                        const newItems = [...invoice.items];
+                                                        const amount = Math.round(item.quantity * val * 100) / 100;
+                                                        newItems[index] = { ...item, unitPrice: val, amount };
+                                                        setInvoice(recalculateTotals({ ...invoice, items: newItems }));
+                                                    }}
+                                                    className="p-1 h-auto border-none bg-transparent hover:bg-blue-50/50 hover:text-blue-700 focus:bg-white focus:text-black focus:ring-2 focus:ring-blue-500/10 focus:shadow-md transition-all duration-200 -mx-1 rounded-md text-right w-full cursor-text"
+                                                    style={{ fontSize: '12px', color: '#6e6e73', fontFamily: 'inherit', fontVariantNumeric: 'tabular-nums' }}
+                                                />
+                                            </td>
+                                            <td style={{ padding: '8px 8px', textAlign: 'right', color: '#1d1d1f', fontWeight: 500, borderBottom: '1px solid #e8e8ed', fontSize: '12px', fontVariantNumeric: 'tabular-nums' }}>
+                                                {(item.quantity * item.unitPrice).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
                     </div>
 
-                    {/* Totals Section */}
-                    <div className="border-t border-white/10 pt-8 flex justify-end">
-                        <div className="w-72 space-y-3">
-                            <div className="flex justify-between items-baseline pt-4">
-                                <span className="font-bold text-lg">Total Due</span>
-                                <span className="font-bold text-2xl font-mono text-primary">
-                                    {new Intl.NumberFormat('en-US', { style: 'currency', currency: invoice.currency }).format(invoice.total)}
+                    {/* Total Section */}
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '20px' }}>
+                        <div style={{ minWidth: '250px', paddingTop: '12px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '32px' }}>
+                                <span style={{ fontSize: '10px', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#86868b' }}>
+                                    Total Due
+                                </span>
+                                <span style={{ fontSize: '20px', fontWeight: 600, color: '#1d1d1f', letterSpacing: '-0.02em', fontVariantNumeric: 'tabular-nums' }}>
+                                    <span style={{ fontSize: '12px', color: '#86868b', marginRight: '4px' }}>
+                                        {invoice.currency}
+                                    </span>
+                                    {invoice.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                 </span>
                             </div>
                         </div>
                     </div>
+
                 </div>
-            </Card>
+
+                {/* Footer Image */}
+                <div style={{ width: '100%', flexShrink: 0, marginTop: 'auto' }}>
+                    <img src="/src/assets/images/invoice-footer.png" alt="Footer" style={{ width: '100%', height: 'auto', display: 'block' }} />
+                </div>
+            </div>
+
+            <InvoiceIssueDialog
+                isOpen={showIssueDialog}
+                onClose={() => setShowIssueDialog(false)}
+                onConfirm={async () => {
+                    const issuedInvoice = {
+                        ...invoice,
+                        status: 'issued' as const,
+                        date: new Date().toISOString()
+                    };
+                    onSave(issuedInvoice);
+                    setShowIssueDialog(false);
+                    onGeneratePDF(issuedInvoice);
+                }}
+                invoiceNumber={invoice.number}
+                invoiceTotal={invoice.total}
+                currency={invoice.currency}
+            />
         </div>
     );
 }

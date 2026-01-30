@@ -244,15 +244,15 @@ export function InvoicePrintView() {
                         {/* Banking Details - Compact */}
                         {bankingDetails && (
                             <div style={{ marginTop: '12px' }}>
-                                <div style={{ fontSize: '11px', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#86868b', marginBottom: '6px' }}>
+                                <div style={{ fontSize: '13px', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#86868b', marginBottom: '8px' }}>
                                     Beneficiary Details
                                 </div>
-                                <div style={{ fontSize: '12px', color: '#666', lineHeight: 1.6, display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '2px 8px' }}>
+                                <div style={{ fontSize: '14px', color: '#666', lineHeight: 1.6, display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '4px 10px' }}>
                                     <span style={{ fontWeight: 500, color: '#333' }}>Beneficiary:</span> <span>{bankingDetails.beneficiaryName}</span>
                                     <span style={{ fontWeight: 500, color: '#333' }}>Bank:</span> <span>{bankingDetails.beneficiaryBank}</span>
                                     <span style={{ fontWeight: 500, color: '#333' }}>Branch:</span> <span>{bankingDetails.branch}</span>
-                                    <span style={{ fontWeight: 500, color: '#333' }}>IBAN:</span> <span style={{ fontFamily: 'monospace', fontSize: '13px' }}>{bankingDetails.ibanNo}</span>
-                                    <span style={{ fontWeight: 500, color: '#333' }}>SWIFT:</span> <span style={{ fontFamily: 'monospace', fontSize: '13px' }}>{bankingDetails.swiftCode}</span>
+                                    <span style={{ fontWeight: 500, color: '#333' }}>IBAN:</span> <span style={{ fontFamily: 'monospace', fontSize: '15px' }}>{bankingDetails.ibanNo}</span>
+                                    <span style={{ fontWeight: 500, color: '#333' }}>SWIFT:</span> <span style={{ fontFamily: 'monospace', fontSize: '15px' }}>{bankingDetails.swiftCode}</span>
                                 </div>
                             </div>
                         )}
@@ -287,6 +287,7 @@ export function InvoicePrintView() {
                                     letterSpacing: '0.05em',
                                     textTransform: 'uppercase',
                                     color: '#86868b',
+                                    width: '120px',
                                     borderBottom: '1px solid #d2d2d7'
                                 }}>
                                     Description
@@ -299,7 +300,7 @@ export function InvoicePrintView() {
                                     letterSpacing: '0.05em',
                                     textTransform: 'uppercase',
                                     color: '#86868b',
-                                    width: '70px',
+                                    width: '100px',
                                     borderBottom: '1px solid #d2d2d7'
                                 }}>
                                     Qty (Tons)

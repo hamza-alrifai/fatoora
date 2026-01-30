@@ -21,35 +21,27 @@ function App() {
 
   const [activeModule, setActiveModule] = useState<Module>('dashboard');
   const [matcherStep, setMatcherStep] = useState<MatcherStep>('configure');
-  const [isDarkMode, setIsDarkMode] = useState(() => {
-    // Default to device setting
-    if (typeof window !== 'undefined' && window.matchMedia) {
-      return window.matchMedia('(prefers-color-scheme: dark)').matches;
-    }
-    return false;
-  });
-
-  useEffect(() => {
-    if (isDarkMode) {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
-  }, [isDarkMode]);
-
-  const handleToggleTheme = () => {
-    setIsDarkMode(!isDarkMode);
-  };
 
   return (
     <>
-      <Toaster theme={isDarkMode ? "dark" : "light"} position="top-right" />
+      <Toaster
+        theme="light"
+        position="top-right"
+        richColors
+        closeButton
+        toastOptions={{
+          classNames: {
+            toast: "bg-background/80 backdrop-blur-md border-border/50 shadow-xl",
+            description: "text-muted-foreground",
+            actionButton: "bg-primary text-primary-foreground",
+            cancelButton: "bg-muted text-muted-foreground",
+          },
+        }}
+      />
 
       <AppShell
         activeTab={activeModule}
         onTabChange={(tabId: string) => setActiveModule(tabId as Module)}
-        isDarkMode={isDarkMode}
-        onThemeToggle={handleToggleTheme}
       >
         {activeModule === 'dashboard' && <Dashboard />}
         {activeModule === 'matcher' && (
@@ -58,7 +50,11 @@ function App() {
             onStepChange={setMatcherStep}
           />
         )}
-        {activeModule === 'invoicing' && <InvoiceWorkspace />}
+        {activeModule === 'invoicing' && (
+          <InvoiceWorkspace
+            onNavigate={(mod) => setActiveModule(mod as Module)}
+          />
+        )}
         {activeModule === 'customers' && <CustomerWorkspace />}
         {activeModule === 'products' && <ProductWorkspace />}
         {activeModule === 'settings' && <SettingsWorkspace />}

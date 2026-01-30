@@ -3,8 +3,6 @@ import { cn } from '@/lib/utils';
 import {
     Users,
     FileSpreadsheet,
-    Sun,
-    Moon,
     Package,
     Settings,
     Receipt,
@@ -29,11 +27,9 @@ interface AppShellProps {
     children: React.ReactNode;
     activeTab: string;
     onTabChange: (tabId: string) => void;
-    isDarkMode: boolean;
-    onThemeToggle: () => void;
 }
 
-export function AppShell({ children, activeTab, onTabChange, isDarkMode, onThemeToggle }: AppShellProps) {
+export function AppShell({ children, activeTab, onTabChange }: AppShellProps) {
     const [isCollapsed, setIsCollapsed] = React.useState(false);
 
     const navItems: NavItem[] = [
@@ -131,19 +127,6 @@ export function AppShell({ children, activeTab, onTabChange, isDarkMode, onTheme
                             {isCollapsed ? <PanelLeftOpen className="w-5 h-5 shrink-0" /> : <PanelLeftClose className="w-5 h-5 shrink-0" />}
                             <span className={cn("transition-all duration-300 whitespace-nowrap", isCollapsed ? "w-0 opacity-0 hidden" : "w-auto opacity-100 block")}>
                                 Collapse Sidebar
-                            </span>
-                        </button>
-
-                        <button
-                            onClick={onThemeToggle}
-                            className={cn(
-                                "w-full flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-medium text-muted-foreground hover:bg-secondary/50 hover:text-foreground transition-all",
-                                isCollapsed ? "justify-center" : "justify-start"
-                            )}
-                        >
-                            {isDarkMode ? <Moon className="w-5 h-5 shrink-0" /> : <Sun className="w-5 h-5 shrink-0" />}
-                            <span className={cn("transition-all duration-300 whitespace-nowrap", isCollapsed ? "w-0 opacity-0 hidden" : "w-auto opacity-100 block")}>
-                                {isDarkMode ? 'Dark Mode' : 'Light Mode'}
                             </span>
                         </button>
                     </div>
