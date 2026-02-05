@@ -74,12 +74,12 @@ export function SheetPreview({
         };
 
         loadData();
-    }, [filePath]);
-
-    if (!filePath) return null;
+    }, [filePath, selectedCols, selectedRowRange, onColumnSelect, onRowRangeSelect]);
 
     const maxCols = data.length > 0 ? Math.max(...data.map(r => r.length)) : 0;
     const displayCols = allowNewColumn ? maxCols + 1 : maxCols;
+
+    if (!filePath) return null;
 
     const getColLetter = (n: number) => {
         let s = "";

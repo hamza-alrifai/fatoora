@@ -1,22 +1,16 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2, Receipt, Search, ArrowLeft, Calendar, DollarSign, Briefcase } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Card, CardContent } from '@/components/ui/card';
+import { Receipt, Search, ArrowLeft, Calendar, TrendingUp, Clock } from 'lucide-react';
 import { toast } from 'sonner';
 import { GlassAlertDialog } from '@/components/ui/glass-alert-dialog';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { LoadingState } from '@/components/ui/LoadingState';
 import type { Invoice } from '@/types';
 import { InvoiceEditor } from './InvoiceEditor';
 import { format } from 'date-fns';
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from "@/components/ui/table";
-
 
 interface InvoiceWorkspaceProps {
     onNavigate?: (module: string) => void;
@@ -114,7 +108,7 @@ export function InvoiceWorkspace({ onNavigate }: InvoiceWorkspaceProps) {
         inv.to.name.toLowerCase().includes(searchQuery.toLowerCase())
     );
 
-    const totalRevenue = invoices.reduce((acc, inv) => acc + inv.total, 0);
+    const totalRevenue = invoices.reduce((acc, inv) => acc + (inv.total || 0), 0);
 
     const pendingInvoices = invoices.filter(i => i.status !== 'paid').length;
 
@@ -134,7 +128,6 @@ export function InvoiceWorkspace({ onNavigate }: InvoiceWorkspaceProps) {
                     <InvoiceEditor
                         invoice={selectedInvoice}
                         onSave={handleSave}
-                        onCancel={() => setIsEditorOpen(false)}
                         onDelete={() => handleDelete(selectedInvoice.id)}
                         onGeneratePDF={handleGeneratePDF}
                     />
@@ -145,122 +138,124 @@ export function InvoiceWorkspace({ onNavigate }: InvoiceWorkspaceProps) {
 
     // LIST MODE
     return (
-        <div className="flex flex-col h-full w-full bg-background/50 p-6 space-y-6">
-            {/* Header Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <Card className="bg-card/40 border-none shadow-sm backdrop-blur-sm">
-                    <CardHeader className="pb-2">
-                        <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                            <DollarSign className="w-4 h-4" /> Total Revenue
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">{totalRevenue.toLocaleString(undefined, { maximumFractionDigits: 0 })} <span className="text-sm font-normal text-muted-foreground">QAR</span></div>
-                    </CardContent>
-                </Card>
-                <Card className="bg-card/40 border-none shadow-sm backdrop-blur-sm">
-                    <CardHeader className="pb-2">
-                        <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                            <Briefcase className="w-4 h-4" /> Active Invoices
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">{pendingInvoices} <span className="text-sm font-normal text-muted-foreground">pending</span></div>
-                    </CardContent>
-                </Card>
-
-            </div>
-
-            {/* Main Table Area */}
-            <Card className="flex-1 border-none shadow-lg bg-card/30 backdrop-blur-md overflow-hidden flex flex-col">
-                <div className="p-4 border-b border-white/5 flex items-center gap-4">
-                    <div className="relative flex-1 max-w-sm">
-                        <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                        <Input
-                            placeholder="Search invoice # or client..."
-                            className="pl-9 bg-background/50 border-white/10 focus:bg-background/80 transition-all"
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                        />
+        <div className="h-full bg-background overflow-y-auto">
+            <div className="max-w-[1600px] mx-auto px-8 py-8">
+                {/* Header */}
+                <div className="flex items-center justify-between mb-8">
+                    <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-500/20">
+                            <Receipt className="w-6 h-6 text-white" />
+                        </div>
+                        <div>
+                            <h1 className="text-2xl font-bold tracking-tight">Invoices</h1>
+                            <p className="text-sm text-muted-foreground">View, edit, and print invoices</p>
+                        </div>
                     </div>
                 </div>
 
-                <div className="flex-1 overflow-auto">
-                    {isLoading ? (
-                        <div className="flex justify-center items-center h-40"><Loader2 className="animate-spin h-8 w-8 text-primary" /></div>
-                    ) : filteredInvoices.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center h-64 text-muted-foreground space-y-4">
-                            <div className="p-4 bg-secondary/30 rounded-full">
-                                <Receipt className="w-12 h-12 opacity-20" />
+                {/* Stats Cards */}
+                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 mb-8">
+                    <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-blue-500 to-indigo-600 p-6 text-white shadow-xl shadow-blue-500/20">
+                        <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2" />
+                        <div className="relative">
+                            <div className="flex items-center gap-3 mb-3">
+                                <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
+                                    <TrendingUp className="w-5 h-5" />
+                                </div>
+                                <span className="text-blue-100 font-medium">Total Revenue</span>
                             </div>
-                            <div className="text-center">
-                                <h3 className="font-medium text-foreground text-lg">No invoices found</h3>
-                                <p className="text-sm text-muted-foreground mt-1 max-w-xs mx-auto">
-                                    Use the Matcher to process your Excel files and generate invoices automatically.
-                                </p>
-                            </div>
-                            {onNavigate && (
-                                <Button
-                                    onClick={() => onNavigate('matcher')}
-                                    variant="outline"
-                                    className="border-primary/20 text-primary hover:bg-primary/10 hover:text-primary hover:border-primary/50"
-                                >
-                                    Go to Matcher
-                                </Button>
-                            )}
+                            <div className="text-3xl font-bold">{totalRevenue.toLocaleString(undefined, { maximumFractionDigits: 0 })} <span className="text-lg font-normal text-blue-200">QAR</span></div>
                         </div>
-                    ) : (
-                        <Table>
-                            <TableHeader className="bg-muted/20 sticky top-0 backdrop-blur-md z-10">
-                                <TableRow className="hover:bg-transparent border-white/5">
-                                    <TableHead>Number</TableHead>
-                                    <TableHead>Client</TableHead>
-                                    <TableHead>Date</TableHead>
-                                    <TableHead>Amount</TableHead>
-                                    <TableHead>Status</TableHead>
+                    </div>
+                    <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-amber-500 to-orange-600 p-6 text-white shadow-xl shadow-amber-500/20">
+                        <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2" />
+                        <div className="relative">
+                            <div className="flex items-center gap-3 mb-3">
+                                <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
+                                    <Clock className="w-5 h-5" />
+                                </div>
+                                <span className="text-amber-100 font-medium">Pending</span>
+                            </div>
+                            <div className="text-3xl font-bold">{pendingInvoices} <span className="text-lg font-normal text-amber-200">invoices</span></div>
+                        </div>
+                    </div>
+                </div>
 
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
+                {/* Invoice List */}
+                <Card className="overflow-hidden">
+                    <div className="p-5 border-b border-border/50 flex items-center gap-4">
+                        <div className="relative flex-1 max-w-md">
+                            <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                            <Input
+                                placeholder="Search invoice # or client..."
+                                className="pl-11"
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                            />
+                        </div>
+                    </div>
+
+                    <CardContent className="p-0">
+                        {isLoading ? (
+                            <LoadingState label="Loading invoices…" />
+                        ) : filteredInvoices.length === 0 ? (
+                            <EmptyState
+                                title="No invoices yet"
+                                description="Use Process Files to generate invoices"
+                                icon={<Receipt className="h-8 w-8" />}
+                                action={
+                                    onNavigate ? (
+                                        <Button onClick={() => onNavigate('matcher')} variant="soft">
+                                            Go to Process Files
+                                        </Button>
+                                    ) : null
+                                }
+                            />
+                        ) : (
+                            <div className="divide-y divide-border/50">
                                 {filteredInvoices.map((inv) => (
-                                    <TableRow
+                                    <div
                                         key={inv.id}
-                                        className="cursor-pointer hover:bg-white/5 border-white/5 group"
+                                        className="flex items-center justify-between px-6 py-4 hover:bg-muted/30 transition-colors cursor-pointer"
                                         onClick={() => handleEdit(inv)}
                                     >
-                                        <TableCell className="font-mono text-primary font-medium">
-                                            {inv.number}
-                                        </TableCell>
-                                        <TableCell>
-                                            <div className="font-medium">{inv.to.name}</div>
-                                        </TableCell>
-                                        <TableCell>
-                                            <div className="flex items-center gap-2 text-muted-foreground text-xs">
-                                                <Calendar className="w-3 h-3" />
-                                                {format(new Date(inv.date), 'MMM d, yyyy')}
+                                        <div className="flex items-center gap-4">
+                                            <div className="w-12 h-12 rounded-xl bg-muted flex items-center justify-center">
+                                                <span className="font-mono text-xs font-bold text-muted-foreground">
+                                                    {inv.number.slice(-3)}
+                                                </span>
                                             </div>
-                                        </TableCell>
-                                        <TableCell className="font-medium">
-                                            {inv.total.toLocaleString(undefined, { minimumFractionDigits: 2 })} {inv.currency}
-                                        </TableCell>
-                                        <TableCell>
-                                            <span className={
-                                                inv.status === 'paid' ? "text-green-500 text-xs font-bold uppercase" :
-                                                    inv.status === 'overdue' ? "text-red-500 text-xs font-bold uppercase" :
-                                                        inv.status === 'issued' ? "text-blue-500 text-xs font-bold uppercase" :
-                                                            "text-muted-foreground text-xs font-bold uppercase"
-                                            }>
+                                            <div>
+                                                <div className="font-semibold">{inv.to.name}</div>
+                                                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                                    <Calendar className="w-3 h-3" />
+                                                    {format(new Date(inv.date), 'MMM d, yyyy')}
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-6">
+                                            <div className="text-right">
+                                                <div className="font-bold">{(inv.total || 0).toLocaleString()}</div>
+                                                <div className="text-xs text-muted-foreground">{inv.currency}</div>
+                                            </div>
+                                            <Badge
+                                                variant={
+                                                    inv.status === 'paid' ? 'success' :
+                                                    inv.status === 'overdue' ? 'destructive' :
+                                                    inv.status === 'issued' ? 'info' : 'muted'
+                                                }
+                                                className="capitalize"
+                                            >
                                                 {inv.status}
-                                            </span>
-                                        </TableCell>
-
-                                    </TableRow>
+                                            </Badge>
+                                        </div>
+                                    </div>
                                 ))}
-                            </TableBody>
-                        </Table>
-                    )}
-                </div>
-            </Card>
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
+            </div>
 
             <GlassAlertDialog
                 isOpen={!!invoiceToDelete}

@@ -1,21 +1,12 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-
-import { Plus, Loader2, User, Search } from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/card';
+import { Plus, Users, Search, Mail, Phone } from 'lucide-react';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { LoadingState } from '@/components/ui/LoadingState';
 import { toast } from 'sonner';
 import type { Customer, Invoice } from '@/types';
-
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from "@/components/ui/table";
-
 import { CustomerSheet } from './CustomerSheet';
 
 
@@ -119,126 +110,137 @@ export function CustomerWorkspace() {
         c.email?.toLowerCase().includes(searchQuery.toLowerCase())
     );
 
-    // Calculate aggregated stats
     const totalCustomers = customers.length;
-    const totalVolume = customers.reduce((acc, c) => acc + (c.total20mm || 0) + (c.total10mm || 0), 0);
 
     return (
-        <div className="flex flex-col h-full w-full bg-background/50 p-6 space-y-6">
-            {/* Header Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <Card className="bg-card/40 border-none shadow-sm backdrop-blur-sm">
-                    <CardHeader className="pb-2">
-                        <CardTitle className="text-sm font-medium text-muted-foreground">Total Customers</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">{totalCustomers}</div>
-                    </CardContent>
-                </Card>
-                <Card className="bg-card/40 border-none shadow-sm backdrop-blur-sm">
-                    <CardHeader className="pb-2">
-                        <CardTitle className="text-sm font-medium text-muted-foreground">Total Volume</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">{totalVolume.toLocaleString()} <span className="text-sm font-normal text-muted-foreground">tons</span></div>
-                    </CardContent>
-                </Card>
-                <div className="flex items-end justify-end gap-2">
-                    <Button
-                        size="lg"
-                        className="h-10 px-6 rounded-lg shadow-lg shadow-primary/20 bg-primary hover:bg-primary/90 transition-all"
-                        onClick={handleCreateNew}
-                    >
-                        <Plus className="w-5 h-5 mr-2" /> New Customer
+        <div className="h-full bg-background overflow-y-auto">
+            <div className="max-w-[1600px] mx-auto px-8 py-8">
+                {/* Header */}
+                <div className="flex items-center justify-between mb-8">
+                    <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-orange-500 to-amber-600 flex items-center justify-center shadow-lg shadow-orange-500/20">
+                            <Users className="w-6 h-6 text-white" />
+                        </div>
+                        <div>
+                            <h1 className="text-2xl font-bold tracking-tight">Customers</h1>
+                            <p className="text-sm text-muted-foreground">Manage your customer database</p>
+                        </div>
+                    </div>
+                    <Button onClick={handleCreateNew} className="gap-2">
+                        <Plus className="w-4 h-4" />
+                        New Customer
                     </Button>
                 </div>
-            </div>
 
-            {/* Main Table Area */}
-            <Card className="flex-1 border-none shadow-lg bg-card/30 backdrop-blur-md overflow-hidden flex flex-col">
-                <div className="p-4 border-b border-white/5 flex items-center justify-between gap-4">
-                    <div className="relative flex-1 max-w-sm">
-                        <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                        <Input
-                            placeholder="Search customers..."
-                            className="pl-9 bg-background/50 border-white/10 focus:bg-background/80 transition-all"
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                        />
+                {/* Stats Card */}
+                <div className="grid gap-6 md:grid-cols-3 mb-8">
+                    <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-orange-500 to-amber-600 p-6 text-white shadow-xl shadow-orange-500/20">
+                        <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2" />
+                        <div className="relative">
+                            <div className="flex items-center gap-3 mb-3">
+                                <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
+                                    <Users className="w-5 h-5" />
+                                </div>
+                                <span className="text-orange-100 font-medium">Total Customers</span>
+                            </div>
+                            <div className="text-3xl font-bold">{totalCustomers}</div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Customer List */}
+                <Card className="overflow-hidden">
+                    <div className="p-5 border-b border-border/50 flex items-center gap-4">
+                        <div className="relative flex-1 max-w-md">
+                            <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                            <Input
+                                placeholder="Search customers..."
+                                className="pl-11"
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                            />
+                        </div>
                     </div>
 
-                </div>
-
-                <div className="flex-1 overflow-auto">
-                    {isLoading ? (
-                        <div className="flex justify-center items-center h-40"><Loader2 className="animate-spin h-8 w-8 text-primary" /></div>
-                    ) : filteredCustomers.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
-                            <User className="w-12 h-12 mb-4 opacity-20" />
-                            <p>No customers found</p>
-                        </div>
-                    ) : (
-                        <Table>
-                            <TableHeader className="bg-muted/20 sticky top-0 backdrop-blur-md z-10">
-                                <TableRow className="hover:bg-transparent border-white/5">
-                                    <TableHead className="w-[50px]"></TableHead>
-                                    <TableHead>Customer</TableHead>
-                                    <TableHead>Volume (20mm)</TableHead>
-                                    <TableHead>Volume (10mm)</TableHead>
-
-
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {filteredCustomers.map((customer) => {
-
-                                    return (
-                                        <TableRow
-                                            key={customer.id}
-                                            className="cursor-pointer hover:bg-white/5 border-white/5 group"
-                                            onClick={() => {
-                                                setSelectedCustomer(customer);
-                                                setIsSheetOpen(true);
-                                            }}
-                                        >
-                                            <TableCell>
-                                                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold text-xs uppercase shadow-md">
-                                                    {customer.name.substring(0, 2)}
+                    <CardContent className="p-0">
+                        {isLoading ? (
+                            <LoadingState label="Loading customers…" />
+                        ) : filteredCustomers.length === 0 ? (
+                            <EmptyState
+                                title="No customers yet"
+                                description="Add your first customer to start creating invoices"
+                                icon={<Users className="h-8 w-8" />}
+                                action={
+                                    <Button onClick={handleCreateNew} variant="soft" className="gap-2">
+                                        <Plus className="w-4 h-4" />
+                                        Add Customer
+                                    </Button>
+                                }
+                            />
+                        ) : (
+                            <div className="divide-y divide-border/50">
+                                {filteredCustomers.map((cust) => (
+                                    <div
+                                        key={cust.id}
+                                        className="flex items-center justify-between px-6 py-4 hover:bg-muted/30 transition-colors cursor-pointer"
+                                        onClick={() => {
+                                            setSelectedCustomer(cust);
+                                            setIsSheetOpen(true);
+                                        }}
+                                    >
+                                        <div className="flex items-center gap-4">
+                                            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-orange-100 to-amber-100 flex items-center justify-center">
+                                                <span className="text-lg font-bold text-orange-600">
+                                                    {cust.name.charAt(0).toUpperCase()}
+                                                </span>
+                                            </div>
+                                            <div>
+                                                <div className="font-semibold">{cust.name}</div>
+                                                <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                                                    {cust.email && (
+                                                        <span className="flex items-center gap-1">
+                                                            <Mail className="w-3 h-3" />
+                                                            {cust.email}
+                                                        </span>
+                                                    )}
+                                                    {cust.phone && (
+                                                        <span className="flex items-center gap-1">
+                                                            <Phone className="w-3 h-3" />
+                                                            {cust.phone}
+                                                        </span>
+                                                    )}
                                                 </div>
-                                            </TableCell>
-                                            <TableCell>
-                                                <div className="font-medium">{customer.name}</div>
-                                                <div className="text-xs text-muted-foreground">{customer.email || 'No email'}</div>
-                                            </TableCell>
-                                            <TableCell className="font-mono text-muted-foreground">
-                                                {customer.total20mm?.toLocaleString() || 0}
-                                            </TableCell>
-                                            <TableCell className="font-mono text-muted-foreground">
-                                                {customer.total10mm?.toLocaleString() || 0}
-                                            </TableCell>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-6 text-right">
+                                            <div>
+                                                <div className="text-xs text-muted-foreground">10mm</div>
+                                                <div className="font-mono font-semibold">{(cust.total10mm || 0).toLocaleString()}</div>
+                                            </div>
+                                            <div>
+                                                <div className="text-xs text-muted-foreground">20mm</div>
+                                                <div className="font-mono font-semibold">{(cust.total20mm || 0).toLocaleString()}</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
+            </div>
 
-
-                                        </TableRow>
-                                    );
-                                })}
-                            </TableBody>
-                        </Table>
-                    )}
-                </div>
-            </Card>
-
-            {/* Editing Sheet */}
-            {/* Editing Sheet */}
             <CustomerSheet
                 isOpen={isSheetOpen}
-                onClose={() => setIsSheetOpen(false)}
                 customer={selectedCustomer}
-                onSave={handleSave}
-                onDelete={handleDelete}
                 invoices={customerInvoices}
+                onClose={() => {
+                    setIsSheetOpen(false);
+                    setSelectedCustomer(null);
+                }}
+                onSave={handleSave}
+                onDelete={(id) => handleDelete(id)}
             />
-
-
         </div>
     );
 }

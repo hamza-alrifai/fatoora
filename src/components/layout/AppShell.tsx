@@ -3,12 +3,11 @@ import { cn } from '@/lib/utils';
 import {
     Users,
     FileSpreadsheet,
-    Package,
     Settings,
     Receipt,
-    PanelLeftClose,
-    PanelLeftOpen,
-    LayoutDashboard
+    LayoutDashboard,
+    ChevronLeft,
+    ChevronRight
 } from 'lucide-react';
 import {
     Tooltip,
@@ -21,6 +20,7 @@ interface NavItem {
     id: string;
     label: string;
     icon: React.ElementType;
+    color: string;
 }
 
 interface AppShellProps {
@@ -33,77 +33,93 @@ export function AppShell({ children, activeTab, onTabChange }: AppShellProps) {
     const [isCollapsed, setIsCollapsed] = React.useState(false);
 
     const navItems: NavItem[] = [
-        { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-        { id: 'matcher', label: 'Matcher', icon: FileSpreadsheet },
-        { id: 'invoicing', label: 'Invoices', icon: Receipt },
-        { id: 'customers', label: 'Customers', icon: Users },
-        { id: 'products', label: 'Products', icon: Package },
-        { id: 'settings', label: 'Settings', icon: Settings },
+        { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, color: 'from-violet-500 to-purple-600' },
+        { id: 'matcher', label: 'Reconciliation', icon: FileSpreadsheet, color: 'from-emerald-500 to-teal-600' },
+        { id: 'invoicing', label: 'Invoices', icon: Receipt, color: 'from-blue-500 to-indigo-600' },
+        { id: 'customers', label: 'Customers', icon: Users, color: 'from-orange-500 to-amber-600' },
+        { id: 'settings', label: 'Settings', icon: Settings, color: 'from-slate-500 to-slate-600' },
     ];
 
     return (
         <TooltipProvider delayDuration={0}>
-            <div className="flex h-screen w-screen overflow-hidden bg-background text-foreground font-sans selection:bg-primary/30">
-                {/* Sidebar */}
+            <div className="flex h-screen w-screen overflow-hidden bg-background">
+                {/* Modern Sidebar */}
                 <aside
                     className={cn(
-                        "flex-shrink-0 flex flex-col glass border-r z-20 transition-all duration-300 ease-in-out relative",
-                        isCollapsed ? "w-[80px]" : "w-[280px]"
+                        "relative flex-shrink-0 flex flex-col bg-card border-r border-border/50 z-20 transition-all duration-300 ease-out",
+                        isCollapsed ? "w-20" : "w-64"
                     )}
                 >
                     {/* Drag Region */}
-                    <div className="h-6 w-full shrink-0" style={{ WebkitAppRegion: 'drag' } as any} />
+                    <div className="h-8 w-full shrink-0" style={{ WebkitAppRegion: 'drag' } as any} />
 
-                    {/* Logo Area */}
-                    <div className={cn("px-6 pb-6 transition-all duration-300", isCollapsed ? "px-4" : "px-6")}>
-                        <div className={cn("flex items-center gap-3", isCollapsed && "justify-center")}>
-                            <div className="min-w-[40px] w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-violet-600 flex items-center justify-center shadow-lg shadow-primary/20 ring-1 ring-white/10 shrink-0">
-                                <span className="text-white font-bold text-xl">F</span>
-                            </div>
-                            <div className={cn("overflow-hidden transition-all duration-300", isCollapsed ? "w-0 opacity-0" : "w-auto opacity-100")}>
-                                <h1 className="font-bold text-lg tracking-tight whitespace-nowrap">Fatoora</h1>
-                                <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-semibold whitespace-nowrap">Enterprise</p>
-                            </div>
+                    {/* Logo */}
+                    <div className={cn(
+                        "flex items-center gap-3 px-5 pb-8",
+                        isCollapsed && "justify-center px-0"
+                    )}>
+                        <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg shadow-emerald-500/25">
+                            <span className="text-white font-bold text-xl">F</span>
                         </div>
+                        {!isCollapsed && (
+                            <div className="animate-fade">
+                                <h1 className="text-xl font-bold tracking-tight">Fatoora</h1>
+                                <p className="text-[11px] text-muted-foreground font-medium">Invoice Platform</p>
+                            </div>
+                        )}
                     </div>
 
                     {/* Navigation */}
-                    <nav className="flex-1 px-4 space-y-2 overflow-y-auto overflow-x-hidden">
-                        {navItems.map((item) => {
+                    <nav className="flex-1 px-3 space-y-1.5">
+                        {!isCollapsed && (
+                            <div className="px-3 mb-4">
+                                <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
+                                    Menu
+                                </span>
+                            </div>
+                        )}
+                        
+                        {navItems.map((item, index) => {
                             const Icon = item.icon;
                             const isActive = activeTab === item.id;
 
                             const ButtonContent = (
                                 <button
                                     onClick={() => onTabChange(item.id)}
+                                    style={{ animationDelay: `${index * 50}ms` }}
                                     className={cn(
-                                        "w-full flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-medium transition-all duration-200 group relative overflow-hidden",
+                                        "w-full flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-semibold transition-all duration-200 group animate-slide-in",
                                         isActive
-                                            ? "bg-primary/10 text-primary shadow-inner shadow-primary/5"
-                                            : "text-muted-foreground hover:bg-secondary/50 hover:text-foreground",
-                                        isCollapsed ? "justify-center" : "justify-start"
+                                            ? "bg-gradient-to-r from-primary/10 to-primary/5 text-primary shadow-sm"
+                                            : "text-muted-foreground hover:text-foreground hover:bg-muted/50",
+                                        isCollapsed && "justify-center px-0"
                                     )}
                                 >
-                                    {isActive && (
-                                        <div className={cn(
-                                            "absolute bg-primary rounded-full shadow-[0_0_12px_rgba(99,102,241,0.5)] transition-all",
-                                            isCollapsed ? "inset-2 opacity-10" : "left-0 top-0 bottom-0 w-1 opacity-100"
+                                    <div className={cn(
+                                        "flex items-center justify-center w-9 h-9 rounded-xl transition-all duration-200",
+                                        isActive 
+                                            ? `bg-gradient-to-br ${item.color} shadow-lg` 
+                                            : "bg-muted/80 group-hover:bg-muted"
+                                    )}>
+                                        <Icon className={cn(
+                                            "w-[18px] h-[18px] transition-colors",
+                                            isActive ? "text-white" : "text-muted-foreground group-hover:text-foreground"
                                         )} />
+                                    </div>
+                                    {!isCollapsed && (
+                                        <span className="flex-1 text-left">{item.label}</span>
                                     )}
-                                    <Icon className={cn("w-5 h-5 shrink-0 transition-colors", isActive ? "text-primary" : "text-muted-foreground group-hover:text-foreground")} />
-                                    <span className={cn("transition-all duration-300 whitespace-nowrap", isCollapsed ? "w-0 opacity-0 hidden" : "w-auto opacity-100 block")}>
-                                        {item.label}
-                                    </span>
+                                    {!isCollapsed && isActive && (
+                                        <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+                                    )}
                                 </button>
                             );
 
                             if (isCollapsed) {
                                 return (
                                     <Tooltip key={item.id}>
-                                        <TooltipTrigger asChild>
-                                            {ButtonContent}
-                                        </TooltipTrigger>
-                                        <TooltipContent side="right" className="font-medium bg-popover/80 backdrop-blur-md">
+                                        <TooltipTrigger asChild>{ButtonContent}</TooltipTrigger>
+                                        <TooltipContent side="right" sideOffset={12} className="font-semibold">
                                             {item.label}
                                         </TooltipContent>
                                     </Tooltip>
@@ -114,33 +130,34 @@ export function AppShell({ children, activeTab, onTabChange }: AppShellProps) {
                         })}
                     </nav>
 
-                    {/* Footer Actions */}
-                    <div className="p-4 mt-auto border-t border-white/5 space-y-2">
-                        {/* Toggle Button */}
+                    {/* Collapse Toggle */}
+                    <div className="p-4 mt-auto">
                         <button
                             onClick={() => setIsCollapsed(!isCollapsed)}
                             className={cn(
-                                "w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-medium text-muted-foreground hover:bg-secondary/50 hover:text-foreground transition-all group",
-                                isCollapsed ? "justify-center" : "justify-start"
+                                "w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-all",
+                                isCollapsed && "px-0"
                             )}
                         >
-                            {isCollapsed ? <PanelLeftOpen className="w-5 h-5 shrink-0" /> : <PanelLeftClose className="w-5 h-5 shrink-0" />}
-                            <span className={cn("transition-all duration-300 whitespace-nowrap", isCollapsed ? "w-0 opacity-0 hidden" : "w-auto opacity-100 block")}>
-                                Collapse Sidebar
-                            </span>
+                            {isCollapsed ? (
+                                <ChevronRight className="w-4 h-4" />
+                            ) : (
+                                <>
+                                    <ChevronLeft className="w-4 h-4" />
+                                    <span>Collapse</span>
+                                </>
+                            )}
                         </button>
                     </div>
+
+                    {/* Subtle gradient overlay at bottom */}
+                    <div className="absolute bottom-0 left-0 right-0 h-20 bg-gradient-to-t from-card to-transparent pointer-events-none" />
                 </aside>
 
                 {/* Main Content */}
-                <main className="flex-1 flex flex-col min-w-0 relative transition-all duration-300">
-
-
-                    <div className="flex-1 overflow-y-auto relative custom-scrollbar">
-                        {/* Background blob animation */}
-                        <div className="absolute top-[-20%] right-[-10%] w-[500px] h-[500px] bg-primary/20 blur-[120px] rounded-full pointer-events-none opacity-50" />
-
-                        <div className="relative h-full w-full animate-in fade-in zoom-in-95 duration-300">
+                <main className="flex-1 flex flex-col min-w-0 bg-background overflow-hidden">
+                    <div className="flex-1 overflow-y-auto">
+                        <div className="h-full w-full">
                             {children}
                         </div>
                     </div>

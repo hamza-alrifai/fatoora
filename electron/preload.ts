@@ -55,4 +55,12 @@ contextBridge.exposeInMainWorld('electron', {
     onInvoiceData: (callback: (event: any, data: any) => void) => ipcRenderer.on('print-data', callback),
     sendPrintReady: () => ipcRenderer.send('print-ready'),
     sendPrintWindowReady: () => ipcRenderer.send('print-window-ready'),
+    
+    // Event listeners for background services
+    on: (channel: string, callback: (...args: any[]) => void) => {
+        ipcRenderer.on(channel, callback);
+    },
+    removeListener: (channel: string, callback: (...args: any[]) => void) => {
+        ipcRenderer.removeListener(channel, callback);
+    },
 });

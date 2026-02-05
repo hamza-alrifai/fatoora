@@ -1,15 +1,19 @@
 import { test, expect, _electron as electron, ElectronApplication, Page } from '@playwright/test';
 import path from 'path';
 
+const APP_ROOT = path.join(__dirname, '..');
+
 let app: ElectronApplication;
 let page: Page;
 
 test.beforeAll(async () => {
-    // Build the app first
+    // Build step runs before Playwright via npm script
     app = await electron.launch({
-        args: [path.join(__dirname, '../dist-electron/main.js')],
+        args: ['.'],
+        cwd: APP_ROOT,
         env: {
             ...process.env,
+            ELECTRON_RUN_AS_NODE: '0',
             NODE_ENV: 'test',
         },
     });
@@ -30,13 +34,13 @@ test.describe('Fatoora App', () => {
         expect(title).toBeTruthy();
 
         // Dashboard should be the default view
-        const dashboard = page.locator('text=Dashboard').first();
-        await expect(dashboard).toBeVisible({ timeout: 10000 });
+        const overview = page.locator('text=Overview').first();
+        await expect(overview).toBeVisible({ timeout: 10000 });
     });
 
     test('should navigate to Invoicing tab', async () => {
         // Click on Invoicing in the sidebar
-        const invoicingTab = page.locator('text=Invoicing').first();
+        const invoicingTab = page.locator('text=Invoices').first();
         await invoicingTab.click();
 
         // Should show invoice list or empty state
@@ -52,15 +56,6 @@ test.describe('Fatoora App', () => {
         await page.waitForTimeout(500);
         const pageContent = await page.content();
         expect(pageContent.toLowerCase()).toContain('customer');
-    });
-
-    test('should navigate to Products tab', async () => {
-        const productsTab = page.locator('text=Products').first();
-        await productsTab.click();
-
-        await page.waitForTimeout(500);
-        const pageContent = await page.content();
-        expect(pageContent.toLowerCase()).toContain('product');
     });
 
     test('should navigate to Settings tab', async () => {

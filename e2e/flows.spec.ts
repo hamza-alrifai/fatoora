@@ -1,13 +1,16 @@
 import { test, expect, _electron as electron, ElectronApplication, Page } from '@playwright/test';
 import path from 'path';
 
+const APP_ROOT = path.join(__dirname, '..');
+
 let app: ElectronApplication;
 let page: Page;
 
 test.beforeAll(async () => {
     app = await electron.launch({
-        args: [path.join(__dirname, '../dist-electron/main.js')],
-        env: { ...process.env, NODE_ENV: 'test' },
+        args: ['.'],
+        cwd: APP_ROOT,
+        env: { ...process.env, ELECTRON_RUN_AS_NODE: '0', NODE_ENV: 'test' },
     });
     page = await app.firstWindow();
     await page.waitForLoadState('domcontentloaded');
@@ -20,7 +23,7 @@ test.afterAll(async () => {
 test.describe('Invoice Creation Flow', () => {
     test('should navigate to invoicing and create new invoice', async () => {
         // Navigate to Invoicing
-        await page.locator('text=Invoicing').first().click();
+        await page.locator('text=Invoices').first().click();
         await page.waitForTimeout(500);
 
         // Look for "New Invoice" or "+" button

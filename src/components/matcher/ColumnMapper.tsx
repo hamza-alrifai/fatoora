@@ -74,10 +74,10 @@ export function ColumnMapper({
         <GlassDialog
             isOpen={open}
             onClose={() => onOpenChange(false)}
-            title="Map Columns"
+            title={`Map Columns`}
             description={
                 <span>
-                    Please confirm the columns for <span className="font-extrabold text-black dark:text-white text-lg">"{fileName}"</span>.
+                    Please confirm the columns for <span className="font-extrabold text-xl text-foreground break-all">{fileName ? fileName : 'the selected file'}</span>.
                 </span>
             }
             className="max-w-5xl"
@@ -89,7 +89,7 @@ export function ColumnMapper({
 
                     {/* ID Column Selection */}
                     <div className="space-y-3">
-                        <label className="text-xl font-bold text-foreground flex items-center gap-3">
+                        <label className="text-lg font-bold text-foreground flex items-center gap-3">
                             <span className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/20 text-primary text-base font-bold">1</span>
                             {fileType === 'master' ? 'Ticket Number Column' : 'Description / Material Column'} <span className="text-destructive">*</span>
                         </label>
@@ -97,7 +97,7 @@ export function ColumnMapper({
                             value={idCol}
                             onChange={(e) => setIdCol(Number(e.target.value))}
                             className={cn(
-                                "w-full bg-background/50 border rounded-xl h-14 px-4 text-lg font-medium focus:outline-none focus:ring-2 focus:ring-primary/50 shadow-sm",
+                                "w-full bg-background/50 border rounded-xl h-12 px-4 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary/50 shadow-sm",
                                 idCol === -1 ? "border-destructive text-destructive" : "border-white/10"
                             )}
                         >
@@ -108,7 +108,7 @@ export function ColumnMapper({
                     {/* Result Column Selection (Only for Master) */}
                     {fileType === 'master' && (
                         <div className="space-y-3">
-                            <label className="text-xl font-bold text-foreground flex items-center gap-3">
+                            <label className="text-lg font-bold text-foreground flex items-center gap-3">
                                 <span className="flex items-center justify-center w-8 h-8 rounded-full bg-emerald-500/20 text-emerald-600 text-base font-bold">2</span>
                                 Customer Name Column <span className="text-destructive">*</span>
                             </label>
@@ -116,7 +116,7 @@ export function ColumnMapper({
                                 value={resultCol}
                                 onChange={(e) => setResultCol(Number(e.target.value))}
                                 className={cn(
-                                    "w-full bg-background/50 border rounded-xl h-14 px-4 text-lg font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500/50 shadow-sm",
+                                    "w-full bg-background/50 border rounded-xl h-12 px-4 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500/50 shadow-sm",
                                     resultCol === -1 ? "border-destructive text-destructive" : "border-white/10"
                                 )}
                             >
@@ -128,7 +128,7 @@ export function ColumnMapper({
                     {/* Customer Selection (Only for Target) */}
                     {fileType === 'target' && (
                         <div className="space-y-3">
-                            <label className="text-xl font-bold text-foreground flex items-center gap-3">
+                            <label className="text-lg font-bold text-foreground flex items-center gap-3">
                                 <span className="flex items-center justify-center w-8 h-8 rounded-full bg-blue-500/20 text-blue-600 text-base font-bold">2</span>
                                 Matches Customer Label <span className="text-destructive">*</span>
                             </label>
@@ -136,7 +136,7 @@ export function ColumnMapper({
                                 value={matchLabel}
                                 onChange={(e) => setMatchLabel(e.target.value)}
                                 className={cn(
-                                    "w-full bg-background/50 border rounded-xl h-14 px-4 text-lg font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/50 shadow-sm",
+                                    "w-full bg-background/50 border rounded-xl h-12 px-4 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/50 shadow-sm",
                                     !matchLabel ? "border-destructive text-destructive font-medium" : "border-white/10"
                                 )}
                             >
@@ -167,12 +167,12 @@ export function ColumnMapper({
                                         {headers.slice(0, 20).map(h => (
                                             <TableHead key={h.index} className={cn(
                                                 "whitespace-nowrap h-10 text-sm font-bold px-4 py-2",
-                                                h.index === idCol ? "text-yellow-900 bg-yellow-100 dark:bg-yellow-900/50 dark:text-yellow-100 border-b-2 border-yellow-500" : "",
-                                                h.index === resultCol ? "text-amber-900 bg-amber-100 dark:bg-amber-900/50 dark:text-amber-100 border-b-2 border-amber-500" : ""
+                                                h.index === idCol ? "!text-yellow-900 !bg-yellow-200 !border-b-4 !border-yellow-600 !font-bold" : "",
+                                                h.index === resultCol ? "!text-yellow-900 !bg-yellow-200 !border-b-4 !border-yellow-600 !font-bold" : ""
                                             )}>
                                                 <div className="flex items-center gap-2">
                                                     {h.name}
-                                                    {h.index === resultCol && <Badge variant="outline" className="text-[10px] px-1.5 py-0.5 h-5 leading-none border-amber-500 text-amber-700 dark:text-amber-400">Result</Badge>}
+                                                    {h.index === resultCol && <Badge variant="outline" className="!text-[10px] !px-1.5 !py-0.5 !h-5 !leading-none !border-yellow-600 !text-yellow-800 !bg-yellow-100 !font-bold">Result</Badge>}
                                                 </div>
                                             </TableHead>
                                         ))}
@@ -185,8 +185,8 @@ export function ColumnMapper({
                                             {headers.slice(0, 20).map(h => (
                                                 <TableCell key={h.index} className={cn(
                                                     "py-3 px-4 font-mono text-sm whitespace-nowrap text-foreground/80",
-                                                    h.index === idCol ? "text-yellow-900 font-medium bg-yellow-50 dark:text-yellow-100 dark:bg-yellow-900/20" : "",
-                                                    h.index === resultCol ? "text-amber-900 font-medium bg-amber-50 dark:text-amber-100 dark:bg-amber-900/20" : ""
+                                                    h.index === idCol ? "!text-yellow-900 !font-bold !bg-yellow-100" : "",
+                                                    h.index === resultCol ? "!text-yellow-900 !font-bold !bg-yellow-100" : ""
                                                 )}>
                                                     {String(row[h.index] || '')}
                                                 </TableCell>

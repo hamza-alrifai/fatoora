@@ -3,16 +3,15 @@ import type { Invoice, Customer, BankingDetails } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Save, Trash2, Printer, Receipt } from 'lucide-react';
-import { calculateAmount, calculateSubtotal } from '@/utils/calculations';
+import { sanitizeAndConsolidateItems, recalculateInvoiceTotals } from '@/utils/invoice-item-utils';
 import { InvoiceIssueDialog } from './InvoiceIssueDialog';
-import { cn } from '@/lib/utils';
+import { InvoiceItemsTable } from './InvoiceItemsTable';
 import { Badge } from '@/components/ui/badge';
 
 
 interface InvoiceEditorProps {
     invoice: Invoice;
     onSave: (invoice: Invoice) => void;
-    onCancel: () => void;
     onDelete: () => void;
     onGeneratePDF: (invoice: Invoice) => void;
 }
@@ -29,40 +28,12 @@ export function InvoiceEditor({ invoice: initialInvoice, onSave, onDelete, onGen
     const [customers, setCustomers] = useState<Customer[]>([]);
     const [bankingDetails, setBankingDetails] = useState<BankingDetails | null>(null);
     const [showIssueDialog, setShowIssueDialog] = useState(false);
+    
+    // Invoice is locked if it's not a draft
+    const isLocked = invoice.status !== 'draft';
 
     useEffect(() => {
-        // Sanitize and Consolidate Items on Load
-        const sanitizeItems = (inv: Invoice) => {
-            const items20mm = inv.items.filter(i => i.description.toLowerCase().includes('20mm'));
-            const items10mm = inv.items.filter(i => i.description.toLowerCase().includes('10mm'));
-
-            const merged20mm = items20mm.reduce((acc, curr) => ({
-                ...acc,
-                quantity: acc.quantity + curr.quantity,
-                amount: acc.amount + curr.amount
-            }), { id: 'fixed-20', description: 'Gabbro 20mm', quantity: 0, unitPrice: items20mm[0]?.unitPrice || 0, amount: 0, type: '20mm' });
-
-            // Recalculate amount using utility for consistent rounding
-            if (merged20mm.quantity > 0 && merged20mm.unitPrice > 0) {
-                merged20mm.amount = calculateAmount(merged20mm.quantity, merged20mm.unitPrice);
-            }
-
-            const merged10mm = items10mm.reduce((acc, curr) => ({
-                ...acc,
-                quantity: acc.quantity + curr.quantity,
-                amount: acc.amount + curr.amount
-            }), { id: 'fixed-10', description: 'Gabbro 10mm', quantity: 0, unitPrice: items10mm[0]?.unitPrice || 0, amount: 0, type: '10mm' });
-
-            if (merged10mm.quantity > 0 && merged10mm.unitPrice > 0) {
-                merged10mm.amount = calculateAmount(merged10mm.quantity, merged10mm.unitPrice);
-            }
-
-            const cleanList = [merged20mm, merged10mm];
-
-            return recalculateTotals({ ...inv, items: cleanList });
-        };
-
-        setInvoice(sanitizeItems(initialInvoice));
+        setInvoice(sanitizeAndConsolidateItems(initialInvoice));
     }, [initialInvoice]);
 
     useEffect(() => {
@@ -120,24 +91,14 @@ export function InvoiceEditor({ invoice: initialInvoice, onSave, onDelete, onGen
     };
 
     const handleChange = (field: keyof Invoice, value: any) => {
+        if (isLocked) return; // Prevent changes to locked invoices
         setInvoice(prev => ({ ...prev, [field]: value }));
     };
 
 
 
     const handleSave = () => {
-        // Recalculate totals before saving to ensure consistency
-        onSave(recalculateTotals(invoice));
-    };
-
-    const recalculateTotals = (inv: Invoice): Invoice => {
-        const subtotal = calculateSubtotal(inv.items);
-        return {
-            ...inv,
-            subtotal,
-            tax: 0,
-            total: subtotal
-        };
+        onSave(recalculateInvoiceTotals(invoice));
     };
 
 
@@ -152,24 +113,37 @@ export function InvoiceEditor({ invoice: initialInvoice, onSave, onDelete, onGen
                     <span className="font-bold text-sm text-foreground">
                         {invoice.number === 'DRAFT' ? 'New Invoice' : invoice.number}
                     </span>
-                    <Badge variant={invoice.status === 'paid' ? 'default' : 'secondary'} className="uppercase text-[10px] h-5">
+                    <Badge 
+                        variant={invoice.status === 'paid' ? 'default' : invoice.status === 'issued' ? 'secondary' : 'outline'} 
+                        className="uppercase text-[10px] h-5"
+                    >
                         {invoice.status}
                     </Badge>
+                    {isLocked && (
+                        <Badge variant="destructive" className="text-[10px] h-5 gap-1">
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                            </svg>
+                            LOCKED
+                        </Badge>
+                    )}
                 </div>
 
                 <div className="flex items-center gap-2">
                     {invoice.id && (
                         <>
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => {
-                                    if (confirm('Are you sure you want to delete this invoice?')) onDelete();
-                                }}
-                                className="h-8 text-muted-foreground hover:text-red-500 hover:bg-red-50"
-                            >
-                                <Trash2 className="w-3.5 h-3.5 mr-1.5" /> Delete
-                            </Button>
+                            {!isLocked && (
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => {
+                                        if (confirm('Are you sure you want to delete this invoice?')) onDelete();
+                                    }}
+                                    className="h-8 text-muted-foreground hover:text-red-500 hover:bg-red-50"
+                                >
+                                    <Trash2 className="w-3.5 h-3.5 mr-1.5" /> Delete
+                                </Button>
+                            )}
                             <Button
                                 variant="outline"
                                 size="sm"
@@ -181,17 +155,19 @@ export function InvoiceEditor({ invoice: initialInvoice, onSave, onDelete, onGen
                         </>
                     )}
 
-                    <Button onClick={handleSave} variant="default" size="sm" className="h-8 shadow-sm">
-                        <Save className="w-3.5 h-3.5 mr-1.5" /> Save
-                    </Button>
+                    {!isLocked && (
+                        <Button onClick={handleSave} variant="outline" size="sm" className="h-8">
+                            <Save className="w-3.5 h-3.5 mr-1.5" /> Save Draft
+                        </Button>
+                    )}
 
                     {invoice.status === 'draft' && (
                         <Button
                             onClick={() => setShowIssueDialog(true)}
-                            className="bg-emerald-600 hover:bg-emerald-700 text-white h-8 shadow-sm"
+                            className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white h-8 shadow-lg shadow-emerald-500/25 font-semibold px-4"
                             size="sm"
                         >
-                            <Receipt className="w-3.5 h-3.5 mr-1.5" /> Issue
+                            <Receipt className="w-3.5 h-3.5 mr-1.5" /> Issue Invoice
                         </Button>
                     )}
                 </div>
@@ -204,6 +180,7 @@ export function InvoiceEditor({ invoice: initialInvoice, onSave, onDelete, onGen
                     minHeight: '297mm',
                     backgroundColor: '#ffffff',
                     fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif',
+                    fontSize: '14px',
                     color: '#1d1d1f',
                     boxSizing: 'border-box',
                     display: 'flex',
@@ -232,7 +209,7 @@ export function InvoiceEditor({ invoice: initialInvoice, onSave, onDelete, onGen
                     }}>
                         {/* Invoice No */}
                         <div>
-                            <div style={{ fontSize: '10px', fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', color: '#86868b', marginBottom: '3px' }}>
+                            <div style={{ fontSize: '14px', fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', color: '#86868b', marginBottom: '3px' }}>
                                 Invoice No.
                             </div>
                             <div style={{ fontSize: '14px', fontWeight: 600, color: '#1d1d1f' }}>
@@ -240,87 +217,99 @@ export function InvoiceEditor({ invoice: initialInvoice, onSave, onDelete, onGen
                             </div>
                         </div>
 
-                        {/* Date */}
+                        {/* Issue Date */}
                         <div>
-                            <div style={{ fontSize: '9px', fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', color: '#86868b', marginBottom: '3px' }}>
-                                Date
+                            <div style={{ fontSize: '14px', fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', color: '#86868b', marginBottom: '3px' }}>
+                                Issue Date
                             </div>
-                            <Input
-                                type="date"
-                                value={invoice.date.split('T')[0]}
-                                onChange={(e) => handleChange('date', new Date(e.target.value).toISOString())}
-                                className="p-1 h-auto border-none bg-transparent hover:bg-blue-50/50 hover:text-blue-700 focus:bg-white focus:ring-2 focus:ring-blue-500/10 focus:shadow-md transition-all duration-200 -mx-1 rounded-md w-full cursor-pointer"
-                                style={{ fontSize: '13px', color: '#1d1d1f', fontFamily: 'inherit' }}
-                            />
+                            {invoice.status === 'draft' ? (
+                                <div style={{ fontSize: '14px', fontWeight: 600, color: '#86868b', padding: '4px 0' }}>
+                                    ---
+                                </div>
+                            ) : (
+                                <Input
+                                    type="date"
+                                    value={invoice.date.split('T')[0]}
+                                    disabled={true}
+                                    className="p-1 h-auto border-none bg-transparent opacity-70 cursor-not-allowed -mx-1 rounded-md w-full !text-[14px]"
+                                    style={{ color: '#1d1d1f', fontFamily: 'inherit' }}
+                                    readOnly
+                                />
+                            )}
                         </div>
 
                         {/* Due Date */}
                         <div>
-                            <div style={{ fontSize: '9px', fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', color: '#86868b', marginBottom: '3px' }}>
+                            <div style={{ fontSize: '14px', fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', color: '#86868b', marginBottom: '3px' }}>
                                 Due Date
                             </div>
                             <Input
                                 type="date"
                                 value={invoice.dueDate ? invoice.dueDate.split('T')[0] : ''}
                                 onChange={(e) => handleChange('dueDate', new Date(e.target.value).toISOString())}
-                                className="p-1 h-auto border-none bg-transparent hover:bg-blue-50/50 hover:text-blue-700 focus:bg-white focus:ring-2 focus:ring-blue-500/10 focus:shadow-md transition-all duration-200 -mx-1 rounded-md w-full cursor-pointer"
-                                style={{ fontSize: '13px', color: '#1d1d1f', fontFamily: 'inherit' }}
+                                disabled={isLocked}
+                                className="p-1 h-auto border-none bg-transparent hover:bg-blue-50/50 hover:text-blue-700 focus:bg-white focus:ring-2 focus:ring-blue-500/10 focus:shadow-md transition-all duration-200 -mx-1 rounded-md w-full cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed !text-[14px]"
+                                style={{ color: '#1d1d1f', fontFamily: 'inherit' }}
                             />
                         </div>
 
                         {/* LPO No */}
                         <div>
-                            <div style={{ fontSize: '9px', fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', color: '#86868b', marginBottom: '3px' }}>
+                            <div style={{ fontSize: '14px', fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', color: '#86868b', marginBottom: '3px' }}>
                                 LPO No.
                             </div>
                             <Input
                                 value={invoice.lpoNo || ''}
                                 onChange={(e) => handleChange('lpoNo', e.target.value)}
-                                className="p-1 h-auto border-none bg-transparent hover:bg-blue-50/50 hover:text-blue-700 focus:bg-white focus:text-black focus:ring-2 focus:ring-blue-500/10 focus:shadow-md transition-all duration-200 -mx-1 rounded-md w-full placeholder:text-gray-300 cursor-text"
+                                disabled={isLocked}
+                                className="p-1 h-auto border-none bg-transparent hover:bg-blue-50/50 hover:text-blue-700 focus:bg-white focus:text-black focus:ring-2 focus:ring-blue-500/10 focus:shadow-md transition-all duration-200 -mx-1 rounded-md w-full placeholder:text-gray-300 cursor-text disabled:opacity-70 disabled:cursor-not-allowed !text-[14px]"
                                 placeholder="-"
-                                style={{ fontSize: '13px', color: '#1d1d1f', fontFamily: 'inherit' }}
+                                style={{ color: '#1d1d1f', fontFamily: 'inherit' }}
                             />
                         </div>
 
                         {/* LPO Date */}
                         <div>
-                            <div style={{ fontSize: '9px', fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', color: '#86868b', marginBottom: '3px' }}>
+                            <div style={{ fontSize: '14px', fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', color: '#86868b', marginBottom: '3px' }}>
                                 LPO Date
                             </div>
                             <Input
                                 type="date"
                                 value={invoice.lpoDate ? invoice.lpoDate.split('T')[0] : ''}
+                                disabled={isLocked}
                                 onChange={(e) => handleChange('lpoDate', e.target.value)}
-                                className="p-1 h-auto border-none bg-transparent hover:bg-blue-50/50 hover:text-blue-700 focus:bg-white focus:text-black focus:ring-2 focus:ring-blue-500/10 focus:shadow-md transition-all duration-200 -mx-1 rounded-md w-full text-gray-500 focus:text-black cursor-pointer"
-                                style={{ fontSize: '13px', fontFamily: 'inherit' }}
+                                className="p-1 h-auto border-none bg-transparent hover:bg-blue-50/50 hover:text-blue-700 focus:bg-white focus:text-black focus:ring-2 focus:ring-blue-500/10 focus:shadow-md transition-all duration-200 -mx-1 rounded-md w-full text-gray-500 focus:text-black cursor-pointer !text-[14px]"
+                                style={{ fontFamily: 'inherit' }}
                             />
                         </div>
 
                         {/* Commercial Offer Ref */}
                         <div>
-                            <div style={{ fontSize: '9px', fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', color: '#86868b', marginBottom: '3px' }}>
+                            <div style={{ fontSize: '14px', fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', color: '#86868b', marginBottom: '3px' }}>
                                 Commercial Offer Ref
                             </div>
                             <Input
                                 value={invoice.commercialOfferRef || ''}
                                 onChange={(e) => handleChange('commercialOfferRef', e.target.value)}
-                                className="p-1 h-auto border-none bg-transparent hover:bg-blue-50/50 hover:text-blue-700 focus:bg-white focus:text-black focus:ring-2 focus:ring-blue-500/10 focus:shadow-md transition-all duration-200 -mx-1 rounded-md w-full placeholder:text-gray-300 cursor-text"
+                                disabled={isLocked}
+                                className="p-1 h-auto border-none bg-transparent hover:bg-blue-50/50 hover:text-blue-700 focus:bg-white focus:text-black focus:ring-2 focus:ring-blue-500/10 focus:shadow-md transition-all duration-200 -mx-1 rounded-md w-full placeholder:text-gray-300 cursor-text disabled:opacity-70 disabled:cursor-not-allowed !text-[14px]"
                                 placeholder="-"
-                                style={{ fontSize: '13px', color: '#1d1d1f', fontFamily: 'inherit' }}
+                                style={{ color: '#1d1d1f', fontFamily: 'inherit' }}
                             />
                         </div>
 
                         {/* Commercial Offer Date */}
                         <div>
-                            <div style={{ fontSize: '9px', fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', color: '#86868b', marginBottom: '3px' }}>
+                            <div style={{ fontSize: '14px', fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', color: '#86868b', marginBottom: '3px' }}>
                                 Commercial Offer Date
                             </div>
                             <Input
                                 type="date"
                                 value={invoice.commercialOfferDate ? invoice.commercialOfferDate.split('T')[0] : ''}
                                 onChange={(e) => handleChange('commercialOfferDate', e.target.value)}
-                                className="p-1 h-auto border-none bg-transparent hover:bg-blue-50/50 hover:text-blue-700 focus:bg-white focus:text-black focus:ring-2 focus:ring-blue-500/10 focus:shadow-md transition-all duration-200 -mx-1 rounded-md w-full text-gray-500 focus:text-black cursor-pointer"
-                                style={{ fontSize: '13px', fontFamily: 'inherit' }}
+                                disabled={isLocked}
+                                className="p-1 h-auto border-none bg-transparent hover:bg-blue-50/50 hover:text-blue-700 focus:bg-white focus:text-black focus:ring-2 focus:ring-blue-500/10 focus:shadow-md transition-all duration-200 -mx-1 rounded-md w-full text-gray-500 focus:text-black cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed !text-[14px]"
+                                style={{ fontFamily: 'inherit' }}
                             />
                         </div>
                     </div>
@@ -332,30 +321,31 @@ export function InvoiceEditor({ invoice: initialInvoice, onSave, onDelete, onGen
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '20px' }}>
                             {/* Payment Terms */}
                             <div>
-                                <div style={{ fontSize: '11px', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#86868b', marginBottom: '4px' }}>
+                                <div style={{ fontSize: '14px', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#86868b', marginBottom: '4px' }}>
                                     Payment Terms
                                 </div>
                                 <Input
                                     value={invoice.paymentTerms || ''}
                                     onChange={(e) => handleChange('paymentTerms', e.target.value)}
-                                    className="p-1 h-auto border-none bg-transparent hover:bg-blue-50/50 hover:text-blue-700 focus:bg-white focus:text-black focus:ring-2 focus:ring-blue-500/10 focus:shadow-md transition-all duration-200 -mx-1 rounded-md w-full cursor-text"
+                                    disabled={isLocked}
+                                    className="p-1 h-auto border-none bg-transparent hover:bg-blue-50/50 hover:text-blue-700 focus:bg-white focus:text-black focus:ring-2 focus:ring-blue-500/10 focus:shadow-md transition-all duration-200 -mx-1 rounded-md w-full cursor-text disabled:opacity-70 disabled:cursor-not-allowed !text-[14px]"
                                     placeholder="Payment due within 30 days."
-                                    style={{ fontSize: '14px', color: '#6e6e73', lineHeight: 1.4, fontFamily: 'inherit' }}
+                                    style={{ color: '#6e6e73', lineHeight: 1.4, fontFamily: 'inherit' }}
                                 />
                             </div>
 
                             {/* Banking Details */}
                             {bankingDetails && (
                                 <div style={{ marginTop: '12px' }}>
-                                    <div style={{ fontSize: '13px', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#86868b', marginBottom: '8px' }}>
+                                    <div style={{ fontSize: '14px', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#86868b', marginBottom: '8px' }}>
                                         Beneficiary Details
                                     </div>
                                     <div style={{ fontSize: '14px', color: '#666', lineHeight: 1.6, display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '4px 10px' }}>
                                         <span style={{ fontWeight: 500, color: '#333' }}>Beneficiary:</span> <span>{bankingDetails.beneficiaryName}</span>
                                         <span style={{ fontWeight: 500, color: '#333' }}>Bank:</span> <span>{bankingDetails.beneficiaryBank}</span>
                                         <span style={{ fontWeight: 500, color: '#333' }}>Branch:</span> <span>{bankingDetails.branch}</span>
-                                        <span style={{ fontWeight: 500, color: '#333' }}>IBAN:</span> <span style={{ fontFamily: 'monospace', fontSize: '15px' }}>{bankingDetails.ibanNo}</span>
-                                        <span style={{ fontWeight: 500, color: '#333' }}>SWIFT:</span> <span style={{ fontFamily: 'monospace', fontSize: '15px' }}>{bankingDetails.swiftCode}</span>
+                                        <span style={{ fontWeight: 500, color: '#333' }}>IBAN:</span> <span style={{ fontFamily: 'monospace', fontSize: '14px' }}>{bankingDetails.ibanNo}</span>
+                                        <span style={{ fontWeight: 500, color: '#333' }}>SWIFT:</span> <span style={{ fontFamily: 'monospace', fontSize: '14px' }}>{bankingDetails.swiftCode}</span>
                                     </div>
                                 </div>
                             )}
@@ -363,13 +353,13 @@ export function InvoiceEditor({ invoice: initialInvoice, onSave, onDelete, onGen
 
                         {/* Right: Bill To */}
                         <div style={{ paddingLeft: '20px', borderLeft: '1px solid #eee' }}>
-                            <div style={{ fontSize: '11px', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#86868b', marginBottom: '8px' }}>
+                            <div style={{ fontSize: '14px', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#86868b', marginBottom: '8px' }}>
                                 Billed To
                             </div>
-                            <div style={{ marginBottom: '4px', fontSize: '15px', fontWeight: 700, color: '#1d1d1f' }}>
+                            <div style={{ marginBottom: '4px', fontSize: '14px', fontWeight: 700, color: '#1d1d1f' }}>
                                 {invoice.to.name || 'Select Customer...'}
                             </div>
-                            <div style={{ lineHeight: 1.5, fontSize: '13px', color: '#6e6e73' }}>
+                            <div style={{ lineHeight: 1.5, fontSize: '14px', color: '#6e6e73' }}>
                                 <div>{invoice.to.address || 'No Address'}</div>
                                 {invoice.to.phone && (
                                     <div className="flex items-center gap-1">
@@ -381,142 +371,17 @@ export function InvoiceEditor({ invoice: initialInvoice, onSave, onDelete, onGen
                         </div>
                     </div>
 
-                    {/* Items Table Description */}
-                    <div style={{ marginBottom: '16px' }}>
-                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
-                            <thead>
-                                <tr style={{ backgroundColor: '#f5f5f7' }}>
-                                    <th style={{ textAlign: 'left', padding: '10px 8px', fontSize: '10px', fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', color: '#86868b', width: '120px', borderBottom: '1px solid #d2d2d7' }}>
-                                        Description
-                                    </th>
-                                    <th style={{ textAlign: 'right', padding: '10px 8px', fontSize: '10px', fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', color: '#86868b', width: '100px', borderBottom: '1px solid #d2d2d7' }}>
-                                        Qty (Tons)
-                                    </th>
-                                    <th style={{ textAlign: 'right', padding: '10px 8px', fontSize: '10px', fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', color: '#86868b', width: '60px', borderBottom: '1px solid #d2d2d7' }}>
-                                        Mix %
-                                    </th>
-                                    <th style={{ textAlign: 'right', padding: '10px 8px', fontSize: '10px', fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', color: '#86868b', width: '90px', borderBottom: '1px solid #d2d2d7' }}>
-                                        Rate
-                                    </th>
-                                    <th style={{ textAlign: 'right', padding: '10px 8px', fontSize: '10px', fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', color: '#86868b', width: '100px', borderBottom: '1px solid #d2d2d7' }}>
-                                        Amount
-                                    </th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {invoice.items.map((item, index) => {
-                                    const isExcess = item.description.includes('Excess');
-                                    const totalQty = invoice.items.reduce((acc, i) => acc + i.quantity, 0);
-
-                                    return (
-                                        <tr key={item.id || index} className="group hover:bg-gray-50 transition-colors">
-                                            <td style={{ padding: '8px 8px', borderBottom: '1px solid #e8e8ed', position: 'relative' }}>
-                                                <div className="flex items-center gap-2">
-                                                    <Input
-                                                        value={item.description}
-                                                        onChange={(e) => {
-                                                            const newItems = [...invoice.items];
-                                                            newItems[index] = { ...item, description: e.target.value };
-                                                            setInvoice(recalculateTotals({ ...invoice, items: newItems }));
-                                                        }}
-                                                        className={cn(
-                                                            "p-1 h-auto border-none bg-transparent",
-                                                            "hover:bg-blue-50/50 hover:text-blue-700 hover:shadow-sm",
-                                                            "focus:bg-white focus:text-black focus:ring-2 focus:ring-blue-500/10 focus:shadow-md focus:scale-[1.01]",
-                                                            "transition-all duration-200 ease-out -mx-1 rounded-md w-full font-medium cursor-text",
-                                                            isExcess ? "text-orange-600" : "text-[#1d1d1f]"
-                                                        )}
-                                                        style={{ fontSize: '12px', fontFamily: 'inherit' }}
-                                                    />
-
-                                                    {/* Hover Controls */}
-                                                    <div className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 flex items-center gap-1 bg-white shadow-sm border rounded px-1">
-                                                        <button
-                                                            onClick={() => {
-                                                                const newItems = invoice.items.filter((_, i) => i !== index);
-                                                                setInvoice(recalculateTotals({ ...invoice, items: newItems }));
-                                                            }}
-                                                            className="p-1 hover:text-red-500 text-gray-400"
-                                                            title="Delete"
-                                                        >
-                                                            <Trash2 className="w-3 h-3" />
-                                                        </button>
-                                                        <div className="h-3 w-px bg-gray-200" />
-                                                        <button
-                                                            onClick={() => {
-                                                                const newItems = [...invoice.items];
-                                                                let newDesc = item.description;
-                                                                if (!newDesc.includes('Excess')) {
-                                                                    newDesc += ' Excess';
-                                                                } else {
-                                                                    newDesc = newDesc.replace(/Excess/g, '').trim();
-                                                                }
-                                                                newItems[index] = { ...item, description: newDesc };
-                                                                setInvoice(recalculateTotals({ ...invoice, items: newItems }));
-                                                            }}
-                                                            className={cn(
-                                                                "p-1 text-[9px] font-bold uppercase tracking-wider",
-                                                                isExcess ? "text-orange-500" : "text-gray-400 hover:text-orange-500"
-                                                            )}
-                                                            title="Toggle Penalty"
-                                                        >
-                                                            {isExcess ? 'Penalty On' : 'Penalty'}
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                            </td>
-                                            <td style={{ padding: '8px 8px', textAlign: 'right', borderBottom: '1px solid #e8e8ed' }}>
-                                                <Input
-                                                    type="number"
-                                                    value={item.quantity}
-                                                    onChange={(e) => {
-                                                        const val = parseFloat(e.target.value) || 0;
-                                                        const newItems = [...invoice.items];
-                                                        const amount = Math.round(val * item.unitPrice * 100) / 100;
-                                                        newItems[index] = { ...item, quantity: val, amount };
-                                                        setInvoice(recalculateTotals({ ...invoice, items: newItems }));
-                                                    }}
-                                                    className="p-1 h-auto border-none bg-transparent hover:bg-blue-50/50 hover:text-blue-700 focus:bg-white focus:text-black focus:ring-2 focus:ring-blue-500/10 focus:shadow-md transition-all duration-200 -mx-1 rounded-md text-right w-full cursor-text"
-                                                    style={{ fontSize: '12px', color: '#6e6e73', fontFamily: 'inherit', fontVariantNumeric: 'tabular-nums' }}
-                                                />
-                                            </td>
-                                            <td style={{ padding: '8px 8px', textAlign: 'right', color: '#6e6e73', borderBottom: '1px solid #e8e8ed', fontSize: '12px', fontVariantNumeric: 'tabular-nums' }}>
-                                                {totalQty > 0 ? ((item.quantity / totalQty) * 100).toFixed(1) + '%' : '-'}
-                                            </td>
-                                            <td style={{ padding: '8px 8px', textAlign: 'right', borderBottom: '1px solid #e8e8ed' }}>
-                                                <Input
-                                                    type="number"
-                                                    value={item.unitPrice}
-                                                    onChange={(e) => {
-                                                        const val = parseFloat(e.target.value) || 0;
-                                                        const newItems = [...invoice.items];
-                                                        const amount = Math.round(item.quantity * val * 100) / 100;
-                                                        newItems[index] = { ...item, unitPrice: val, amount };
-                                                        setInvoice(recalculateTotals({ ...invoice, items: newItems }));
-                                                    }}
-                                                    className="p-1 h-auto border-none bg-transparent hover:bg-blue-50/50 hover:text-blue-700 focus:bg-white focus:text-black focus:ring-2 focus:ring-blue-500/10 focus:shadow-md transition-all duration-200 -mx-1 rounded-md text-right w-full cursor-text"
-                                                    style={{ fontSize: '12px', color: '#6e6e73', fontFamily: 'inherit', fontVariantNumeric: 'tabular-nums' }}
-                                                />
-                                            </td>
-                                            <td style={{ padding: '8px 8px', textAlign: 'right', color: '#1d1d1f', fontWeight: 500, borderBottom: '1px solid #e8e8ed', fontSize: '12px', fontVariantNumeric: 'tabular-nums' }}>
-                                                {(item.quantity * item.unitPrice).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                            </td>
-                                        </tr>
-                                    );
-                                })}
-                            </tbody>
-                        </table>
-                    </div>
+                    <InvoiceItemsTable invoice={invoice} setInvoice={setInvoice} isLocked={isLocked} />
 
                     {/* Total Section */}
                     <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '20px' }}>
                         <div style={{ minWidth: '250px', paddingTop: '12px' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '32px' }}>
-                                <span style={{ fontSize: '10px', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#86868b' }}>
+                                <span style={{ fontSize: '14px', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#86868b' }}>
                                     Total Due
                                 </span>
-                                <span style={{ fontSize: '20px', fontWeight: 600, color: '#1d1d1f', letterSpacing: '-0.02em', fontVariantNumeric: 'tabular-nums' }}>
-                                    <span style={{ fontSize: '12px', color: '#86868b', marginRight: '4px' }}>
+                                <span style={{ fontSize: '16px', fontWeight: 600, color: '#1d1d1f', letterSpacing: '-0.02em', fontVariantNumeric: 'tabular-nums' }}>
+                                    <span style={{ fontSize: '16px', color: '#86868b', marginRight: '4px' }}>
                                         {invoice.currency}
                                     </span>
                                     {invoice.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}

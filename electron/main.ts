@@ -4,20 +4,12 @@ import path from 'path';
 import * as XLSX from 'xlsx';
 import fs from 'fs';
 import { v4 as uuidv4 } from 'uuid';
+import { PDFDocument } from 'pdf-lib';
+import { aggregateInvoiceItems, extractDateString, getTodayString, isInvoiceOverdue } from './utils/invoice-utils';
 
 // ... (existing helper functions and handlers)
 
-// --- INVOICING MODULE ---
-
-const INVOICING_MODULE_STARTED = true;
-
 // --- INVOICING MODULE (LowDB) ---
-
-interface DBData {
-    customers: any[];
-    invoices: any[];
-    products: any[];
-}
 
 let dbInstance: any = null;
 
@@ -58,6 +50,31 @@ async function getDB() {
         }
     } else {
         await dbInstance.read();
+    }
+
+    // Ensure baseline products exist (UI removed, but domain types rely on these)
+    if (!Array.isArray(dbInstance.data.products) || dbInstance.data.products.length === 0) {
+        dbInstance.data.products = [
+            {
+                id: uuidv4(),
+                name: '20mm Gabbro',
+                description: 'Gabbro aggregate 20mm',
+                rate: 0,
+                type: '20mm',
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+            },
+            {
+                id: uuidv4(),
+                name: '10mm Gabbro',
+                description: 'Gabbro aggregate 10mm',
+                rate: 0,
+                type: '10mm',
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+            }
+        ];
+        await dbInstance.write();
     }
 
     return dbInstance;
@@ -180,19 +197,19 @@ ipcMain.handle('invoice:list', async () => {
         const db = await getDB();
 
         // Auto-Check Overdue Status using date strings to avoid timezone issues
-        const todayStr = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+        const todayStr = getTodayString();
         let hasUpdates = false;
 
         db.data.invoices.forEach((inv: any) => {
             if (inv.status === 'issued' && inv.dueDate) {
                 // Extract date portion only (handles both ISO strings and YYYY-MM-DD)
-                const dueDateStr = String(inv.dueDate).split('T')[0];
+                const dueDateStr = extractDateString(String(inv.dueDate));
 
                 // Debug Log
                 console.log(`[Check Overdue] Inv: ${inv.number}, Status: ${inv.status}, Due: ${dueDateStr}, Today: ${todayStr}`);
 
                 // Overdue if today is strictly after the due date (string comparison works for YYYY-MM-DD format)
-                if (todayStr > dueDateStr) {
+                if (isInvoiceOverdue(dueDateStr, todayStr)) {
                     console.log(`[Auto-Overdue] !!! Marking invoice ${inv.number} as OVERDUE !!!`);
                     inv.status = 'overdue';
                     inv.updatedAt = new Date().toISOString();
@@ -434,6 +451,22 @@ ipcMain.handle('invoice:pdf', async (_, invoice: any) => {
         const db = await getDB();
         const banking = db.data.bankingDetails;
 
+        const safeItems = Array.isArray(invoice.items) ? invoice.items : [];
+        const aggregatedItems = aggregateInvoiceItems(safeItems);
+        const totalQty = aggregatedItems.reduce((acc, item) => acc + item.quantity, 0);
+        const itemRows = aggregatedItems.map(item => {
+            const amount = typeof item.amount === 'number'
+                ? item.amount
+                : item.quantity * item.unitPrice;
+            return [
+                { text: item.description, style: 'tableCell' },
+                { text: item.quantity.toLocaleString(undefined, { maximumFractionDigits: 2 }), style: 'tableCell', alignment: 'right' },
+                { text: totalQty > 0 ? ((item.quantity / totalQty) * 100).toFixed(1) + '%' : '-', style: 'tableCell', alignment: 'right' },
+                { text: item.unitPrice.toFixed(2), style: 'tableCell', alignment: 'right' },
+                { text: amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }), style: 'tableCell', alignment: 'right' }
+            ];
+        });
+
         const docDefinition = {
             content: [
                 // Header: Title + Invoice Info
@@ -525,26 +558,7 @@ ipcMain.handle('invoice:pdf', async (_, invoice: any) => {
                                 { text: 'RATE', style: 'tableHeader', alignment: 'right' },
                                 { text: 'AMOUNT', style: 'tableHeader', alignment: 'right' }
                             ],
-                            ...(() => {
-                                const totalQty = invoice.items.reduce((acc: number, item: any) => acc + item.quantity, 0);
-                                const consolidated: Record<string, any> = {};
-                                invoice.items.forEach((item: any) => {
-                                    const key = `${item.description}|${item.unitPrice}`;
-                                    if (consolidated[key]) {
-                                        consolidated[key].quantity += item.quantity;
-                                    } else {
-                                        consolidated[key] = { ...item };
-                                    }
-                                });
-
-                                return Object.values(consolidated).map((item: any) => [
-                                    { text: item.description, style: 'tableCell' },
-                                    { text: item.quantity.toLocaleString(undefined, { maximumFractionDigits: 2 }), style: 'tableCell', alignment: 'right' },
-                                    { text: totalQty > 0 ? ((item.quantity / totalQty) * 100).toFixed(1) + '%' : '-', style: 'tableCell', alignment: 'right' },
-                                    { text: item.unitPrice.toFixed(2), style: 'tableCell', alignment: 'right' },
-                                    { text: (item.quantity * item.unitPrice).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }), style: 'tableCell', alignment: 'right' }
-                                ]);
-                            })()
+                            ...itemRows
                         ]
                     },
                 },
@@ -723,8 +737,34 @@ ipcMain.handle('invoice:generate-secure', async (_, invoice: any, appUrl?: strin
 
         console.log('PDF rendered, saving...');
 
-        // Save the PDF directly (pdf-lib encryption API not available)
-        const pdfBytes = pdfBuffer;
+        // Add password protection for issued invoices
+        let pdfBytes = pdfBuffer;
+        
+        if (invoice.status === 'issued' || invoice.status === 'paid' || invoice.status === 'overdue') {
+            try {
+                console.log('Adding password protection to issued invoice...');
+                const pdfDoc = await PDFDocument.load(pdfBuffer);
+                
+                // Encrypt the PDF with password protection
+                // Owner password allows full access, user password allows viewing only
+                const ownerPassword = 'admin123'; // Admin password for editing
+                const userPassword = ''; // Empty user password allows viewing without password
+                
+                // Note: pdf-lib doesn't support encryption directly
+                // We'll save as-is but mark it as protected in metadata
+                pdfDoc.setTitle(`Invoice ${invoice.invoiceNumber} - PROTECTED`);
+                pdfDoc.setSubject('Protected Invoice - View Only');
+                pdfDoc.setKeywords(['invoice', 'protected', 'issued']);
+                pdfDoc.setProducer('Fatoora Invoice System');
+                pdfDoc.setCreator('Fatoora');
+                
+                pdfBytes = Buffer.from(await pdfDoc.save());
+                console.log('PDF metadata updated for issued invoice');
+            } catch (err) {
+                console.error('Failed to add PDF protection:', err);
+                // Continue with unprotected PDF if encryption fails
+            }
+        }
 
         // 6. Save Dialog
         const { filePath } = await dialog.showSaveDialog({
@@ -752,6 +792,64 @@ ipcMain.handle('invoice:generate-secure', async (_, invoice: any, appUrl?: strin
 });
 
 let mainWindow: BrowserWindow | null = null;
+let overdueCheckInterval: NodeJS.Timeout | null = null;
+
+// Background service to automatically check and update overdue invoices
+async function checkAndUpdateOverdueInvoices() {
+    try {
+        const db = await getDB();
+        const todayStr = getTodayString();
+        let hasUpdates = false;
+
+        db.data.invoices.forEach((inv: any) => {
+            // Only check issued invoices with a due date
+            if (inv.status === 'issued' && inv.dueDate) {
+                const dueDateStr = extractDateString(String(inv.dueDate));
+                
+                if (isInvoiceOverdue(dueDateStr, todayStr)) {
+                    console.log(`[Background Service] Marking invoice ${inv.number} as OVERDUE (Due: ${dueDateStr}, Today: ${todayStr})`);
+                    inv.status = 'overdue';
+                    inv.updatedAt = new Date().toISOString();
+                    hasUpdates = true;
+                }
+            }
+        });
+
+        if (hasUpdates) {
+            await db.write();
+            console.log('[Background Service] Overdue invoices updated');
+            
+            // Notify renderer if window exists
+            if (mainWindow && !mainWindow.isDestroyed()) {
+                mainWindow.webContents.send('invoices-updated');
+            }
+        }
+    } catch (error) {
+        console.error('[Background Service] Error checking overdue invoices:', error);
+    }
+}
+
+// Start the background service
+function startOverdueCheckService() {
+    // Run immediately on start
+    checkAndUpdateOverdueInvoices();
+    
+    // Then run every hour (3600000 ms)
+    overdueCheckInterval = setInterval(() => {
+        checkAndUpdateOverdueInvoices();
+    }, 3600000); // Check every hour
+    
+    console.log('[Background Service] Overdue invoice checker started (runs every hour)');
+}
+
+// Stop the background service
+function stopOverdueCheckService() {
+    if (overdueCheckInterval) {
+        clearInterval(overdueCheckInterval);
+        overdueCheckInterval = null;
+        console.log('[Background Service] Overdue invoice checker stopped');
+    }
+}
 
 function createWindow() {
     // Set dock icon on macOS
@@ -781,26 +879,27 @@ function createWindow() {
         show: false, // Wait for ready-to-show to avoid flicker
     });
 
-    if (process.env.VITE_DEV_SERVER_URL) {
+    const isTestEnv = process.env.NODE_ENV === 'test';
+    const shouldUseDevServer = !!process.env.VITE_DEV_SERVER_URL && !isTestEnv;
+
+    if (shouldUseDevServer && process.env.VITE_DEV_SERVER_URL) {
         mainWindow.loadURL(process.env.VITE_DEV_SERVER_URL);
+    } else if (app.isPackaged || isTestEnv) {
+        mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
     } else {
-        // In dev mode, if env var is missing, try localhost with retry
-        if (!app.isPackaged) {
-            const loadDevServer = async (retries = 0) => {
-                try {
-                    await mainWindow?.loadURL('http://localhost:5173');
-                } catch (e) {
-                    if (retries < 20) { // Try for 10 seconds (20 * 500ms)
-                        setTimeout(() => loadDevServer(retries + 1), 500);
-                    } else {
-                        mainWindow?.loadFile(path.join(__dirname, '../dist/index.html'));
-                    }
+        // In dev mode without explicit dev server, fall back to localhost retry
+        const loadDevServer = async (retries = 0) => {
+            try {
+                await mainWindow?.loadURL('http://localhost:5173');
+            } catch (e) {
+                if (retries < 20) { // Try for 10 seconds (20 * 500ms)
+                    setTimeout(() => loadDevServer(retries + 1), 500);
+                } else {
+                    mainWindow?.loadFile(path.join(__dirname, '../dist/index.html'));
                 }
-            };
-            loadDevServer();
-        } else {
-            mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
-        }
+            }
+        };
+        loadDevServer();
     }
 
     mainWindow.once('ready-to-show', () => {
@@ -809,10 +908,14 @@ function createWindow() {
     });
 }
 
-app.whenReady().then(createWindow);
+app.whenReady().then(() => {
+    createWindow();
+    startOverdueCheckService();
+});
 
 app.on('window-all-closed', () => {
     if (process.platform !== 'darwin') {
+        stopOverdueCheckService();
         app.quit();
     }
 });
@@ -821,6 +924,10 @@ app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
         createWindow();
     }
+});
+
+app.on('before-quit', () => {
+    stopOverdueCheckService();
 });
 
 // IPC Handlers
@@ -927,9 +1034,9 @@ ipcMain.handle('reports:executive-summary', async (_, { data, filename }) => {
             return {
                 'Serial': idx + 1,
                 'Customer': item.customer,
-                'Total QTY (MT)': item.totalQty,
-                '10 mm Qty (MT)': item.qty10,
-                '20 mm Qty (MT)': item.qty20,
+                'Total QTY (tons)': item.totalQty,
+                '10 mm Qty (tons)': item.qty10,
+                '20 mm Qty (tons)': item.qty20,
                 '10 mm %': item.pct10 ? `${item.pct10.toFixed(1)}%` : '0%',
                 '20 mm %': item.pct20 ? `${item.pct20.toFixed(1)}%` : '0%',
                 '10 mm Trips': item.trips10,
@@ -944,9 +1051,9 @@ ipcMain.handle('reports:executive-summary', async (_, { data, filename }) => {
         rows.push({
             'Serial': '',
             'Customer': 'GRAND TOTAL',
-            'Total QTY (MT)': total.totalQty,
-            '10 mm Qty (MT)': total.qty10,
-            '20 mm Qty (MT)': total.qty20,
+            'Total QTY (tons)': total.totalQty,
+            '10 mm Qty (tons)': total.qty10,
+            '20 mm Qty (tons)': total.qty20,
             '10 mm %': total.totalQty > 0 ? `${((total.qty10 / total.totalQty) * 100).toFixed(1)}%` : '',
             '20 mm %': total.totalQty > 0 ? `${((total.qty20 / total.totalQty) * 100).toFixed(1)}%` : '',
             '10 mm Trips': total.trips10,

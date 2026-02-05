@@ -19,7 +19,8 @@ describe('Button', () => {
     it('applies variant classes', () => {
         render(<Button variant="destructive">Delete</Button>);
         const button = screen.getByText('Delete');
-        expect(button).toHaveClass('bg-destructive');
+        expect(button.className).toContain('from-destructive');
+        expect(button.className).toContain('to-red-600');
     });
 
     it('can be disabled', () => {
@@ -30,6 +31,7 @@ describe('Button', () => {
     it('applies size classes', () => {
         render(<Button size="sm">Small</Button>);
         const button = screen.getByText('Small');
-        expect(button).toHaveClass('h-8');
+        expect(button.className).toContain('h-9');
+        expect(button.className).toContain('rounded-lg');
     });
 });

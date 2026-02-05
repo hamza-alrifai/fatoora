@@ -4,21 +4,35 @@ import React from 'react';
 interface PageHeaderProps {
     title: string;
     description?: string;
-    children?: React.ReactNode; // Actions
+    children?: React.ReactNode;
     className?: string;
+    breadcrumb?: React.ReactNode;
 }
 
-export function PageHeader({ title, description, children, className }: PageHeaderProps) {
+export function PageHeader({ title, description, children, className, breadcrumb }: PageHeaderProps) {
     return (
-        <div className={cn("flex items-center justify-between mb-8 pb-6 border-b border-border/40", className)}>
-            <div className="space-y-1">
-                <h2 className="text-3xl font-bold tracking-tight text-foreground">{title}</h2>
-                {description && (
-                    <p className="text-muted-foreground">{description}</p>
+        <div className={cn("mb-6", className)}>
+            {breadcrumb && (
+                <div className="mb-2 text-sm text-muted-foreground">
+                    {breadcrumb}
+                </div>
+            )}
+            <div className="flex items-start justify-between gap-4">
+                <div className="space-y-1 min-w-0">
+                    <h1 className="text-2xl font-semibold tracking-tight text-foreground">
+                        {title}
+                    </h1>
+                    {description && (
+                        <p className="text-sm text-muted-foreground max-w-2xl">
+                            {description}
+                        </p>
+                    )}
+                </div>
+                {children && (
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                        {children}
+                    </div>
                 )}
-            </div>
-            <div className="flex items-center gap-2">
-                {children}
             </div>
         </div>
     );

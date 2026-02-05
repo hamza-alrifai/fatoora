@@ -1,26 +1,38 @@
-import { useState, useEffect } from 'react';
+import { useState, lazy, Suspense } from 'react';
 import { Toaster } from 'sonner';
 import { AppShell } from '@/components/layout/AppShell';
-import { MatcherWorkspace } from '@/components/matcher/MatcherWorkspace';
-import { InvoiceWorkspace } from '@/components/invoicing/InvoiceWorkspace';
-import { CustomerWorkspace } from '@/components/customers/CustomerWorkspace';
-import { ProductWorkspace } from '@/components/products/ProductWorkspace';
-import { SettingsWorkspace } from '@/components/settings/SettingsWorkspace';
-import { InvoicePrintView } from '@/components/invoicing/InvoicePrintView';
-import { Dashboard } from '@/components/dashboard/Dashboard';
+import { Loader2 } from 'lucide-react';
 
-type Module = 'dashboard' | 'matcher' | 'invoicing' | 'customers' | 'products' | 'settings';
+// Code splitting: lazy load workspace components
+const MatcherWorkspace = lazy(() => import('@/components/matcher/MatcherWorkspace').then(m => ({ default: m.MatcherWorkspace })));
+const InvoiceWorkspace = lazy(() => import('@/components/invoicing/InvoiceWorkspace').then(m => ({ default: m.InvoiceWorkspace })));
+const CustomerWorkspace = lazy(() => import('@/components/customers/CustomerWorkspace').then(m => ({ default: m.CustomerWorkspace })));
+const SettingsWorkspace = lazy(() => import('@/components/settings/SettingsWorkspace').then(m => ({ default: m.SettingsWorkspace })));
+const InvoicePrintView = lazy(() => import('@/components/invoicing/InvoicePrintView').then(m => ({ default: m.InvoicePrintView })));
+const Dashboard = lazy(() => import('@/components/dashboard/Dashboard').then(m => ({ default: m.Dashboard })));
+
+type Module = 'dashboard' | 'matcher' | 'invoicing' | 'customers' | 'settings';
 type MatcherStep = 'configure' | 'done';
 
 function App() {
+  const [activeModule, setActiveModule] = useState<Module>('dashboard');
+  const [matcherStep, setMatcherStep] = useState<MatcherStep>('configure');
+
   // Check for print mode - HACK: simple routing
   const urlParams = new URLSearchParams(window.location.search);
   if (urlParams.get('mode') === 'print') {
-    return <InvoicePrintView />;
+    return (
+      <Suspense fallback={<div className="flex items-center justify-center min-h-screen"><Loader2 className="w-8 h-8 animate-spin" /></div>}>
+        <InvoicePrintView />
+      </Suspense>
+    );
   }
 
-  const [activeModule, setActiveModule] = useState<Module>('dashboard');
-  const [matcherStep, setMatcherStep] = useState<MatcherStep>('configure');
+  const LoadingFallback = () => (
+    <div className="flex items-center justify-center h-full">
+      <Loader2 className="w-8 h-8 animate-spin text-primary" />
+    </div>
+  );
 
   return (
     <>
@@ -43,21 +55,22 @@ function App() {
         activeTab={activeModule}
         onTabChange={(tabId: string) => setActiveModule(tabId as Module)}
       >
-        {activeModule === 'dashboard' && <Dashboard />}
-        {activeModule === 'matcher' && (
-          <MatcherWorkspace
-            currentStep={matcherStep}
-            onStepChange={setMatcherStep}
-          />
-        )}
-        {activeModule === 'invoicing' && (
-          <InvoiceWorkspace
-            onNavigate={(mod) => setActiveModule(mod as Module)}
-          />
-        )}
-        {activeModule === 'customers' && <CustomerWorkspace />}
-        {activeModule === 'products' && <ProductWorkspace />}
-        {activeModule === 'settings' && <SettingsWorkspace />}
+        <Suspense fallback={<LoadingFallback />}>
+          {activeModule === 'dashboard' && <Dashboard />}
+          {activeModule === 'matcher' && (
+            <MatcherWorkspace
+              currentStep={matcherStep}
+              onStepChange={setMatcherStep}
+            />
+          )}
+          {activeModule === 'invoicing' && (
+            <InvoiceWorkspace
+              onNavigate={(mod) => setActiveModule(mod as Module)}
+            />
+          )}
+          {activeModule === 'customers' && <CustomerWorkspace />}
+          {activeModule === 'settings' && <SettingsWorkspace />}
+        </Suspense>
       </AppShell>
     </>
   );

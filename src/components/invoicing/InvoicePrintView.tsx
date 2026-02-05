@@ -74,19 +74,10 @@ export function InvoicePrintView() {
         }
     }, []);
 
-    // Consolidate items by description + rate
-    const consolidatedItems = useMemo(() => {
+    // Don't consolidate items - preserve split pricing with separate rows
+    const displayItems = useMemo(() => {
         if (!data?.items) return [];
-        const grouped: Record<string, InvoiceItem> = {};
-        data.items.forEach(item => {
-            const key = `${item.description}|${item.unitPrice}`;
-            if (grouped[key]) {
-                grouped[key].quantity += item.quantity;
-            } else {
-                grouped[key] = { ...item };
-            }
-        });
-        return Object.values(grouped);
+        return data.items;
     }, [data?.items]);
 
     if (!data) {
@@ -121,6 +112,7 @@ export function InvoicePrintView() {
             margin: '0 auto',
             backgroundColor: '#ffffff',
             fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif',
+            fontSize: '14px',
             color: '#1d1d1f',
             boxSizing: 'border-box',
             display: 'flex',
@@ -147,7 +139,7 @@ export function InvoicePrintView() {
                 }}>
                     {/* Invoice No - Required */}
                     <div>
-                        <div style={{ fontSize: '10px', fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', color: '#86868b', marginBottom: '3px' }}>
+                        <div style={{ fontSize: '14px', fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', color: '#86868b', marginBottom: '3px' }}>
                             Invoice No.
                         </div>
                         <div style={{ fontSize: '14px', fontWeight: 600, color: '#1d1d1f' }}>
@@ -155,12 +147,12 @@ export function InvoicePrintView() {
                         </div>
                     </div>
 
-                    {/* Date */}
+                    {/* Issue Date */}
                     <div>
-                        <div style={{ fontSize: '9px', fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', color: '#86868b', marginBottom: '3px' }}>
-                            Date
+                        <div style={{ fontSize: '14px', fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', color: '#86868b', marginBottom: '3px' }}>
+                            Issue Date
                         </div>
-                        <div style={{ fontSize: '13px', color: '#1d1d1f' }}>
+                        <div style={{ fontSize: '14px', color: '#1d1d1f' }}>
                             {formatDate(data.date) || '-'}
                         </div>
                     </div>
@@ -168,10 +160,10 @@ export function InvoicePrintView() {
                     {/* Due Date */}
                     {data.dueDate && (
                         <div>
-                            <div style={{ fontSize: '9px', fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', color: '#86868b', marginBottom: '3px' }}>
+                            <div style={{ fontSize: '14px', fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', color: '#86868b', marginBottom: '3px' }}>
                                 Due Date
                             </div>
-                            <div style={{ fontSize: '13px', color: '#1d1d1f' }}>
+                            <div style={{ fontSize: '14px', color: '#1d1d1f' }}>
                                 {formatDate(data.dueDate)}
                             </div>
                         </div>
@@ -180,10 +172,10 @@ export function InvoicePrintView() {
                     {/* LPO No */}
                     {data.lpoNo && (
                         <div>
-                            <div style={{ fontSize: '9px', fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', color: '#86868b', marginBottom: '3px' }}>
+                            <div style={{ fontSize: '14px', fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', color: '#86868b', marginBottom: '3px' }}>
                                 LPO No.
                             </div>
-                            <div style={{ fontSize: '13px', color: '#1d1d1f' }}>
+                            <div style={{ fontSize: '14px', color: '#1d1d1f' }}>
                                 {data.lpoNo}
                             </div>
                         </div>
@@ -192,10 +184,10 @@ export function InvoicePrintView() {
                     {/* LPO Date */}
                     {data.lpoDate && (
                         <div>
-                            <div style={{ fontSize: '9px', fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', color: '#86868b', marginBottom: '3px' }}>
+                            <div style={{ fontSize: '14px', fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', color: '#86868b', marginBottom: '3px' }}>
                                 LPO Date
                             </div>
-                            <div style={{ fontSize: '13px', color: '#1d1d1f' }}>
+                            <div style={{ fontSize: '14px', color: '#1d1d1f' }}>
                                 {formatDate(data.lpoDate)}
                             </div>
                         </div>
@@ -204,10 +196,10 @@ export function InvoicePrintView() {
                     {/* Commercial Offer Ref */}
                     {data.commercialOfferRef && (
                         <div>
-                            <div style={{ fontSize: '9px', fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', color: '#86868b', marginBottom: '3px' }}>
+                            <div style={{ fontSize: '14px', fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', color: '#86868b', marginBottom: '3px' }}>
                                 Commercial Offer Ref
                             </div>
-                            <div style={{ fontSize: '13px', color: '#1d1d1f' }}>
+                            <div style={{ fontSize: '14px', color: '#1d1d1f' }}>
                                 {data.commercialOfferRef}
                             </div>
                         </div>
@@ -216,10 +208,10 @@ export function InvoicePrintView() {
                     {/* Commercial Offer Date */}
                     {data.commercialOfferDate && (
                         <div>
-                            <div style={{ fontSize: '9px', fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', color: '#86868b', marginBottom: '3px' }}>
+                            <div style={{ fontSize: '14px', fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', color: '#86868b', marginBottom: '3px' }}>
                                 Commercial Offer Date
                             </div>
-                            <div style={{ fontSize: '13px', color: '#1d1d1f' }}>
+                            <div style={{ fontSize: '14px', color: '#1d1d1f' }}>
                                 {formatDate(data.commercialOfferDate)}
                             </div>
                         </div>
@@ -233,7 +225,7 @@ export function InvoicePrintView() {
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '20px' }}>
                         {/* Payment Terms */}
                         <div>
-                            <div style={{ fontSize: '11px', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#86868b', marginBottom: '4px' }}>
+                            <div style={{ fontSize: '14px', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#86868b', marginBottom: '4px' }}>
                                 Payment Terms
                             </div>
                             <div style={{ fontSize: '14px', color: '#6e6e73', lineHeight: 1.4 }}>
@@ -244,15 +236,15 @@ export function InvoicePrintView() {
                         {/* Banking Details - Compact */}
                         {bankingDetails && (
                             <div style={{ marginTop: '12px' }}>
-                                <div style={{ fontSize: '13px', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#86868b', marginBottom: '8px' }}>
+                                <div style={{ fontSize: '14px', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#86868b', marginBottom: '8px' }}>
                                     Beneficiary Details
                                 </div>
                                 <div style={{ fontSize: '14px', color: '#666', lineHeight: 1.6, display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '4px 10px' }}>
                                     <span style={{ fontWeight: 500, color: '#333' }}>Beneficiary:</span> <span>{bankingDetails.beneficiaryName}</span>
                                     <span style={{ fontWeight: 500, color: '#333' }}>Bank:</span> <span>{bankingDetails.beneficiaryBank}</span>
                                     <span style={{ fontWeight: 500, color: '#333' }}>Branch:</span> <span>{bankingDetails.branch}</span>
-                                    <span style={{ fontWeight: 500, color: '#333' }}>IBAN:</span> <span style={{ fontFamily: 'monospace', fontSize: '15px' }}>{bankingDetails.ibanNo}</span>
-                                    <span style={{ fontWeight: 500, color: '#333' }}>SWIFT:</span> <span style={{ fontFamily: 'monospace', fontSize: '15px' }}>{bankingDetails.swiftCode}</span>
+                                    <span style={{ fontWeight: 500, color: '#333' }}>IBAN:</span> <span style={{ fontFamily: 'monospace', fontSize: '14px' }}>{bankingDetails.ibanNo}</span>
+                                    <span style={{ fontWeight: 500, color: '#333' }}>SWIFT:</span> <span style={{ fontFamily: 'monospace', fontSize: '14px' }}>{bankingDetails.swiftCode}</span>
                                 </div>
                             </div>
                         )}
@@ -260,13 +252,13 @@ export function InvoicePrintView() {
 
                     {/* Right: Customer Details */}
                     <div style={{ paddingLeft: '20px', borderLeft: '1px solid #eee' }}>
-                        <div style={{ fontSize: '11px', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#86868b', marginBottom: '8px' }}>
+                        <div style={{ fontSize: '14px', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#86868b', marginBottom: '8px' }}>
                             Billed To
                         </div>
-                        <div style={{ fontSize: '15px', fontWeight: 600, color: '#1d1d1f', marginBottom: '4px' }}>
+                        <div style={{ fontSize: '14px', fontWeight: 700, color: '#1d1d1f', marginBottom: '4px' }}>
                             {data.to.name}
                         </div>
-                        <div style={{ fontSize: '13px', color: '#6e6e73', lineHeight: 1.5 }}>
+                        <div style={{ fontSize: '14px', color: '#6e6e73', lineHeight: 1.5 }}>
                             {data.to.address && <div>{data.to.address}</div>}
                             {data.to.phone && <div>Tel: {data.to.phone}</div>}
                             {data.to.email && <div>Email: {data.to.email}</div>}
@@ -276,18 +268,18 @@ export function InvoicePrintView() {
 
                 {/* Items Table - No Flex Grow so Total follows immediately */}
                 <div style={{ marginBottom: '16px' }}>
-                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
                         <thead>
                             <tr style={{ backgroundColor: '#f5f5f7' }}>
                                 <th style={{
                                     textAlign: 'left',
                                     padding: '10px 8px',
-                                    fontSize: '10px',
+                                    fontSize: '14px',
                                     fontWeight: 600,
                                     letterSpacing: '0.05em',
                                     textTransform: 'uppercase',
                                     color: '#86868b',
-                                    width: '120px',
+                                    width: '140px',
                                     borderBottom: '1px solid #d2d2d7'
                                 }}>
                                     Description
@@ -295,33 +287,7 @@ export function InvoicePrintView() {
                                 <th style={{
                                     textAlign: 'right',
                                     padding: '10px 8px',
-                                    fontSize: '10px',
-                                    fontWeight: 600,
-                                    letterSpacing: '0.05em',
-                                    textTransform: 'uppercase',
-                                    color: '#86868b',
-                                    width: '100px',
-                                    borderBottom: '1px solid #d2d2d7'
-                                }}>
-                                    Qty (Tons)
-                                </th>
-                                <th style={{
-                                    textAlign: 'right',
-                                    padding: '10px 8px',
-                                    fontSize: '10px',
-                                    fontWeight: 600,
-                                    letterSpacing: '0.05em',
-                                    textTransform: 'uppercase',
-                                    color: '#86868b',
-                                    width: '60px',
-                                    borderBottom: '1px solid #d2d2d7'
-                                }}>
-                                    Mix %
-                                </th>
-                                <th style={{
-                                    textAlign: 'right',
-                                    padding: '10px 8px',
-                                    fontSize: '10px',
+                                    fontSize: '14px',
                                     fontWeight: 600,
                                     letterSpacing: '0.05em',
                                     textTransform: 'uppercase',
@@ -329,17 +295,43 @@ export function InvoicePrintView() {
                                     width: '90px',
                                     borderBottom: '1px solid #d2d2d7'
                                 }}>
+                                    Qty (Tons)
+                                </th>
+                                <th style={{
+                                    textAlign: 'right',
+                                    padding: '10px 8px',
+                                    fontSize: '14px',
+                                    fontWeight: 600,
+                                    letterSpacing: '0.05em',
+                                    textTransform: 'uppercase',
+                                    color: '#86868b',
+                                    width: '50px',
+                                    borderBottom: '1px solid #d2d2d7'
+                                }}>
+                                    Mix %
+                                </th>
+                                <th style={{
+                                    textAlign: 'right',
+                                    padding: '10px 8px',
+                                    fontSize: '14px',
+                                    fontWeight: 600,
+                                    letterSpacing: '0.05em',
+                                    textTransform: 'uppercase',
+                                    color: '#86868b',
+                                    width: '80px',
+                                    borderBottom: '1px solid #d2d2d7'
+                                }}>
                                     Rate
                                 </th>
                                 <th style={{
                                     textAlign: 'right',
                                     padding: '10px 8px',
-                                    fontSize: '10px',
+                                    fontSize: '14px',
                                     fontWeight: 600,
                                     letterSpacing: '0.05em',
                                     textTransform: 'uppercase',
                                     color: '#86868b',
-                                    width: '100px',
+                                    width: '90px',
                                     borderBottom: '1px solid #d2d2d7'
                                 }}>
                                     Amount
@@ -348,58 +340,69 @@ export function InvoicePrintView() {
                         </thead>
                         <tbody>
                             {(() => {
-                                const totalQty = consolidatedItems.reduce((acc, item) => acc + item.quantity, 0);
-                                return consolidatedItems.map((item, i) => (
-                                    <tr key={i}>
-                                        <td style={{
-                                            padding: '10px 8px',
-                                            color: '#1d1d1f',
-                                            borderBottom: '1px solid #e8e8ed'
-                                        }}>
-                                            {item.description}
-                                        </td>
-                                        <td style={{
-                                            padding: '10px 8px',
-                                            textAlign: 'right',
-                                            color: '#6e6e73',
-                                            fontVariantNumeric: 'tabular-nums',
-                                            borderBottom: '1px solid #e8e8ed'
-                                        }}>
-                                            {item.quantity.toLocaleString(undefined, { maximumFractionDigits: 2 })}
-                                        </td>
-                                        <td style={{
-                                            padding: '10px 8px',
-                                            textAlign: 'right',
-                                            color: '#6e6e73',
-                                            fontVariantNumeric: 'tabular-nums',
-                                            borderBottom: '1px solid #e8e8ed'
-                                        }}>
-                                            {totalQty > 0 ? ((item.quantity / totalQty) * 100).toFixed(1) + '%' : '-'}
-                                        </td>
-                                        <td style={{
-                                            padding: '10px 8px',
-                                            textAlign: 'right',
-                                            color: '#6e6e73',
-                                            fontVariantNumeric: 'tabular-nums',
-                                            borderBottom: '1px solid #e8e8ed'
-                                        }}>
-                                            {item.unitPrice.toFixed(2)}
-                                        </td>
-                                        <td style={{
-                                            padding: '10px 8px',
-                                            textAlign: 'right',
-                                            color: '#1d1d1f',
-                                            fontWeight: 500,
-                                            fontVariantNumeric: 'tabular-nums',
-                                            borderBottom: '1px solid #e8e8ed'
-                                        }}>
-                                            {(item.quantity * item.unitPrice).toLocaleString(undefined, {
-                                                minimumFractionDigits: 2,
-                                                maximumFractionDigits: 2
-                                            })}
-                                        </td>
-                                    </tr>
-                                ));
+                                const totalQty = displayItems.reduce((acc, item) => acc + item.quantity, 0);
+                                return displayItems.map((item, i) => {
+                                    return (
+                                        <tr key={i}>
+                                            <td style={{
+                                                padding: '8px 8px',
+                                                color: '#1d1d1f',
+                                                borderBottom: '1px solid #e8e8ed',
+                                                fontWeight: 400,
+                                                fontSize: '14px'
+                                            }}>
+                                                {item.description}
+                                            </td>
+                                            <td style={{
+                                                padding: '8px 8px',
+                                                textAlign: 'right',
+                                                color: '#6e6e73',
+                                                fontVariantNumeric: 'tabular-nums',
+                                                borderBottom: '1px solid #e8e8ed',
+                                                fontWeight: 400,
+                                                fontSize: '14px'
+                                            }}>
+                                                {item.quantity.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                                            </td>
+                                            <td style={{
+                                                padding: '8px 8px',
+                                                textAlign: 'right',
+                                                color: '#6e6e73',
+                                                fontVariantNumeric: 'tabular-nums',
+                                                borderBottom: '1px solid #e8e8ed',
+                                                fontSize: '14px',
+                                                fontWeight: 400
+                                            }}>
+                                                {totalQty > 0 ? ((item.quantity / totalQty) * 100).toFixed(1) + '%' : '-'}
+                                            </td>
+                                            <td style={{
+                                                padding: '8px 8px',
+                                                textAlign: 'right',
+                                                color: '#6e6e73',
+                                                fontVariantNumeric: 'tabular-nums',
+                                                borderBottom: '1px solid #e8e8ed',
+                                                fontWeight: 400,
+                                                fontSize: '14px'
+                                            }}>
+                                                {item.unitPrice.toFixed(2)}
+                                            </td>
+                                            <td style={{
+                                                padding: '8px 8px',
+                                                textAlign: 'right',
+                                                color: '#1d1d1f',
+                                                fontWeight: 400,
+                                                fontVariantNumeric: 'tabular-nums',
+                                                borderBottom: '1px solid #e8e8ed',
+                                                fontSize: '14px'
+                                            }}>
+                                                {(item.quantity * item.unitPrice).toLocaleString(undefined, {
+                                                    minimumFractionDigits: 2,
+                                                    maximumFractionDigits: 2
+                                                })}
+                                            </td>
+                                        </tr>
+                                    );
+                                });
                             })()}
                         </tbody>
                     </table>
@@ -422,7 +425,7 @@ export function InvoicePrintView() {
                             gap: '32px' // Add space between label and amount
                         }}>
                             <span style={{
-                                fontSize: '10px',
+                                fontSize: '14px',
                                 fontWeight: 600,
                                 letterSpacing: '0.08em',
                                 textTransform: 'uppercase',
@@ -431,13 +434,13 @@ export function InvoicePrintView() {
                                 Total Due
                             </span>
                             <span style={{
-                                fontSize: '20px',
+                                fontSize: '14px',
                                 fontWeight: 600,
                                 color: '#1d1d1f',
                                 letterSpacing: '-0.02em',
                                 fontVariantNumeric: 'tabular-nums'
                             }}>
-                                <span style={{ fontSize: '12px', color: '#86868b', marginRight: '4px' }}>
+                                <span style={{ fontSize: '14px', color: '#86868b', marginRight: '4px' }}>
                                     {data.currency}
                                 </span>
                                 {data.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}

@@ -179,6 +179,8 @@ export interface ElectronAPI {
     onInvoiceData: (callback: (event: any, data: any) => void) => void;
     sendPrintReady: () => void;
     sendPrintWindowReady: () => void;
+    on: (channel: string, callback: (...args: any[]) => void) => void;
+    removeListener: (channel: string, callback: (...args: any[]) => void) => void;
 
     // Customers
     saveCustomer: (customer: Customer) => Promise<{ success: boolean; id?: string; error?: string }>;

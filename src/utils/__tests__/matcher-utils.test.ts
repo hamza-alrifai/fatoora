@@ -2,13 +2,10 @@ import { describe, it, expect } from 'vitest';
 import {
     guessColumns,
     extractUniqueValues,
-    detectProductType,
-    getRateForType,
     calculateMatchStats,
-    aggregateQuantities,
     isValidDataRow,
-    generateExecutiveSummary,
 } from '../matcher-utils';
+import { detectProductType } from '../product-type-utils';
 
 describe('guessColumns', () => {
     it('finds material description column', () => {
@@ -97,20 +94,6 @@ describe('detectProductType', () => {
     });
 });
 
-describe('getRateForType', () => {
-    it('returns rate for 10mm', () => {
-        expect(getRateForType('10mm', 25, 30)).toBe(25);
-    });
-
-    it('returns rate for 20mm', () => {
-        expect(getRateForType('20mm', 25, 30)).toBe(30);
-    });
-
-    it('returns 0 for other', () => {
-        expect(getRateForType('other', 25, 30)).toBe(0);
-    });
-});
-
 describe('calculateMatchStats', () => {
     it('calculates percentage correctly', () => {
         const stats = calculateMatchStats(100, 75);
@@ -127,27 +110,6 @@ describe('calculateMatchStats', () => {
     it('handles 0 total rows', () => {
         const stats = calculateMatchStats(0, 0);
         expect(stats.percentage).toBe(0);
-    });
-});
-
-describe('aggregateQuantities', () => {
-    it('groups by description and rate', () => {
-        const items = [
-            { description: 'Gabbro 10mm', quantity: 50, rate: 25 },
-            { description: 'Gabbro 10mm', quantity: 30, rate: 25 },
-            { description: 'Gabbro 20mm', quantity: 20, rate: 30 },
-        ];
-
-        const result = aggregateQuantities(items);
-
-        expect(result.size).toBe(2);
-        expect(result.get('Gabbro 10mm|25')?.quantity).toBe(80);
-        expect(result.get('Gabbro 20mm|30')?.quantity).toBe(20);
-    });
-
-    it('handles empty array', () => {
-        const result = aggregateQuantities([]);
-        expect(result.size).toBe(0);
     });
 });
 
@@ -170,44 +132,5 @@ describe('isValidDataRow', () => {
 
     it('accepts valid data rows', () => {
         expect(isValidDataRow(['T001', 'Gabbro 10mm', '50'], headerRow)).toBe(true);
-    });
-});
-
-describe('generateExecutiveSummary', () => {
-    const headers = ['ID', 'Desc', 'Qty', 'Customer'];
-    const data = [
-        headers,
-        ['1', 'Gabbro 10mm', '100', 'Customer A'], // 10mm for A
-        ['2', 'Gabbro 20mm', '50', 'Customer A'],  // 20mm for A
-        ['3', 'Gabbro 10mm', '200', 'Customer B'], // 10mm for B
-        ['4', 'Sand', '50', 'Customer B'],         // Other for B
-        ['5', 'Gabbro 20mm', '100', 'Customer A'], // More 20mm for A
-        ['6', 'Gabbro 10mm', '10', ''],            // Invalid customer
-    ];
-
-    // Rate 10mm = 25, Rate 20mm = 30
-
-    it('generates summary for customers', () => {
-        // ID=0, Desc=1, Qty=2, Customer=3
-        const result = generateExecutiveSummary(data, 3, 2, 1, 25, 30);
-
-        expect(result).toHaveLength(2);
-
-        // Check Customer A
-        const custA = result.find(c => c.name === 'Customer A');
-        expect(custA).toBeDefined();
-        expect(custA?.total10mm).toBe(100);
-        expect(custA?.total20mm).toBe(150); // 50 + 100
-        expect(custA?.ticketCount).toBe(3);
-        expect(custA?.amount10mm).toBe(2500); // 100 * 25
-        expect(custA?.amount20mm).toBe(4500); // 150 * 30
-        expect(custA?.totalAmount).toBe(7000); // 2500 + 4500
-
-        // Check Customer B
-        const custB = result.find(c => c.name === 'Customer B');
-        expect(custB).toBeDefined();
-        expect(custB?.total10mm).toBe(200);
-        expect(custB?.totalOther).toBe(50);
-        expect(custB?.ticketCount).toBe(2);
     });
 });

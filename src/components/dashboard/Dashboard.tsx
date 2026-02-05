@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { DollarSign, Users, Receipt, Activity, CalendarClock, AlertCircle } from 'lucide-react';
+import { Users, Receipt, CalendarClock, TrendingUp, Clock, CheckCircle2, ArrowUpRight, Sparkles } from 'lucide-react';
 import type { Invoice } from '@/types';
 import { format } from 'date-fns';
 
@@ -33,14 +32,12 @@ export function Dashboard() {
                 const invoices = invResult.invoices;
                 setAllInvoices(invoices);
 
-                // Calculate Stats
                 const revenue = invoices.reduce((acc, inv) => acc + inv.total, 0);
                 const outstanding = invoices
                     .filter(inv => inv.status !== 'paid' && inv.status !== 'draft')
                     .reduce((acc, inv) => acc + inv.total, 0);
                 const activeInvoices = invoices.filter(inv => inv.status !== 'paid' && inv.status !== 'draft').length;
 
-                // Recent Invoices (Last 5)
                 const sorted = [...invoices].sort((a, b) => new Date(b.createdAt || b.date).getTime() - new Date(a.createdAt || a.date).getTime());
                 setRecentInvoices(sorted.slice(0, 5));
 
@@ -67,246 +64,235 @@ export function Dashboard() {
     };
 
     return (
-        <div className="flex flex-col h-full w-full bg-background/50 p-6 space-y-8 animate-in fade-in duration-500">
-            {/* Header */}
-            <div>
-                <h2 className="text-3xl font-bold tracking-tight">Dashboard</h2>
-                <p className="text-muted-foreground">Overview of your business performance.</p>
-            </div>
-
-            {/* Stats Cards */}
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                <Card className="bg-card/40 border-white/5 backdrop-blur-sm shadow-sm hover:bg-card/60 transition-colors">
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium text-muted-foreground">
-                            Total Revenue
-                        </CardTitle>
-                        <DollarSign className="h-4 w-4 text-emerald-500" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">
-                            {isLoading ? "..." : stats.revenue.toLocaleString(undefined, { maximumFractionDigits: 0 })}
-                            <span className="text-sm font-normal text-muted-foreground ml-1">QAR</span>
+        <div className="h-full bg-background overflow-y-auto">
+            <div className="max-w-[1600px] mx-auto px-8 py-8">
+                {/* Header */}
+                <div className="mb-10">
+                    <div className="flex items-center gap-3 mb-2">
+                        <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-primary to-emerald-600 flex items-center justify-center shadow-lg shadow-primary/20">
+                            <Sparkles className="w-5 h-5 text-white" />
                         </div>
-                        <p className="text-xs text-muted-foreground mt-1">
-                            +20.1% from last month
-                        </p>
-                    </CardContent>
-                </Card>
-                <Card className="bg-card/40 border-white/5 backdrop-blur-sm shadow-sm hover:bg-card/60 transition-colors">
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium text-muted-foreground">
-                            Active Customers
-                        </CardTitle>
-                        <Users className="h-4 w-4 text-blue-500" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">{isLoading ? "..." : stats.customers}</div>
-                        <p className="text-xs text-muted-foreground mt-1">
-                            Total client base
-                        </p>
-                    </CardContent>
-                </Card>
-                <Card className="bg-card/40 border-white/5 backdrop-blur-sm shadow-sm hover:bg-card/60 transition-colors">
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium text-muted-foreground">
-                            Outstanding Balance
-                        </CardTitle>
-                        <Activity className="h-4 w-4 text-amber-500" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">
-                            {isLoading ? "..." : stats.outstanding.toLocaleString(undefined, { maximumFractionDigits: 0 })}
-                            <span className="text-sm font-normal text-muted-foreground ml-1">QAR</span>
+                        <div>
+                            <h1 className="text-2xl font-bold tracking-tight">Welcome back</h1>
+                            <p className="text-sm text-muted-foreground">Here's what's happening with your business</p>
                         </div>
-                        <p className="text-xs text-muted-foreground mt-1">
-                            {stats.activeInvoices} unpaid invoices
-                        </p>
-                    </CardContent>
-                </Card>
-            </div>
+                    </div>
+                </div>
 
-            {/* Recent Screen */}
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
-                <Card className="col-span-4 bg-card/30 border-white/5 backdrop-blur-sm shadow-lg">
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                            <Receipt className="w-5 h-5 text-primary" />
-                            Recent Invoices
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <Table>
-                            <TableHeader className="bg-muted/10">
-                                <TableRow className="border-white/5 hover:bg-transparent">
-                                    <TableHead className="w-[100px]">Invoice</TableHead>
-                                    <TableHead>Client</TableHead>
-                                    <TableHead>Date</TableHead>
-                                    <TableHead>Amount</TableHead>
-                                    <TableHead className="text-right">Status</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {isLoading ? (
-                                    <TableRow>
-                                        <TableCell colSpan={5} className="text-center h-24 text-muted-foreground">
-                                            Loading...
-                                        </TableCell>
-                                    </TableRow>
-                                ) : recentInvoices.length === 0 ? (
-                                    <TableRow>
-                                        <TableCell colSpan={5} className="h-48">
-                                            <div className="flex flex-col items-center justify-center h-full text-center space-y-3">
-                                                <div className="p-4 bg-secondary/50 rounded-full">
-                                                    <Receipt className="w-8 h-8 text-muted-foreground/50" />
+                {/* Stats Cards */}
+                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 mb-8">
+                    {/* Revenue Card */}
+                    <div className="group relative overflow-hidden rounded-3xl bg-gradient-to-br from-emerald-500 to-teal-600 p-6 text-white shadow-xl shadow-emerald-500/20 hover:shadow-2xl hover:shadow-emerald-500/30 transition-all duration-300 hover:-translate-y-1">
+                        <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2" />
+                        <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/5 rounded-full translate-y-1/2 -translate-x-1/2" />
+                        <div className="relative">
+                            <div className="flex items-center justify-between mb-4">
+                                <div className="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur flex items-center justify-center">
+                                    <TrendingUp className="w-6 h-6" />
+                                </div>
+                                <div className="flex items-center gap-1 text-emerald-100 text-sm font-medium">
+                                    <ArrowUpRight className="w-4 h-4" />
+                                    Revenue
+                                </div>
+                            </div>
+                            <div className="text-4xl font-bold mb-1">
+                                {isLoading ? "..." : (stats.revenue || 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                            </div>
+                            <div className="text-emerald-100 text-sm font-medium">QAR Total Revenue</div>
+                        </div>
+                    </div>
+
+                    {/* Customers Card */}
+                    <div className="group relative overflow-hidden rounded-3xl bg-gradient-to-br from-violet-500 to-purple-600 p-6 text-white shadow-xl shadow-violet-500/20 hover:shadow-2xl hover:shadow-violet-500/30 transition-all duration-300 hover:-translate-y-1">
+                        <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2" />
+                        <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/5 rounded-full translate-y-1/2 -translate-x-1/2" />
+                        <div className="relative">
+                            <div className="flex items-center justify-between mb-4">
+                                <div className="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur flex items-center justify-center">
+                                    <Users className="w-6 h-6" />
+                                </div>
+                                <div className="flex items-center gap-1 text-violet-100 text-sm font-medium">
+                                    <ArrowUpRight className="w-4 h-4" />
+                                    Customers
+                                </div>
+                            </div>
+                            <div className="text-4xl font-bold mb-1">
+                                {isLoading ? "..." : stats.customers}
+                            </div>
+                            <div className="text-violet-100 text-sm font-medium">Active Clients</div>
+                        </div>
+                    </div>
+
+                    {/* Outstanding Card */}
+                    <div className="group relative overflow-hidden rounded-3xl bg-gradient-to-br from-amber-500 to-orange-600 p-6 text-white shadow-xl shadow-amber-500/20 hover:shadow-2xl hover:shadow-amber-500/30 transition-all duration-300 hover:-translate-y-1">
+                        <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2" />
+                        <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/5 rounded-full translate-y-1/2 -translate-x-1/2" />
+                        <div className="relative">
+                            <div className="flex items-center justify-between mb-4">
+                                <div className="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur flex items-center justify-center">
+                                    <Clock className="w-6 h-6" />
+                                </div>
+                                <div className="flex items-center gap-1 text-amber-100 text-sm font-medium">
+                                    {stats.activeInvoices} pending
+                                </div>
+                            </div>
+                            <div className="text-4xl font-bold mb-1">
+                                {isLoading ? "..." : (stats.outstanding || 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                            </div>
+                            <div className="text-amber-100 text-sm font-medium">QAR Outstanding</div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Recent Invoices & Aging */}
+                <div className="grid gap-6 lg:grid-cols-5">
+                    {/* Recent Invoices */}
+                    <Card className="lg:col-span-3">
+                        <CardHeader className="pb-4">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-500/20">
+                                    <Receipt className="w-5 h-5 text-white" />
+                                </div>
+                                <div>
+                                    <CardTitle>Recent Invoices</CardTitle>
+                                    <p className="text-sm text-muted-foreground">Latest transactions</p>
+                                </div>
+                            </div>
+                        </CardHeader>
+                        <CardContent className="px-0 pb-0">
+                            {isLoading ? (
+                                <div className="flex items-center justify-center h-48 text-muted-foreground">
+                                    <div className="animate-pulse">Loading...</div>
+                                </div>
+                            ) : recentInvoices.length === 0 ? (
+                                <div className="flex flex-col items-center justify-center h-48 text-center space-y-3">
+                                    <div className="w-14 h-14 rounded-2xl bg-muted flex items-center justify-center">
+                                        <Receipt className="w-7 h-7 text-muted-foreground" />
+                                    </div>
+                                    <div>
+                                        <div className="font-semibold text-foreground">No invoices yet</div>
+                                        <div className="text-sm text-muted-foreground mt-1">Create your first invoice to see it here</div>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="divide-y divide-border/50">
+                                    {recentInvoices.map((inv, index) => (
+                                        <div 
+                                            key={inv.id} 
+                                            className="flex items-center justify-between px-6 py-4 hover:bg-muted/30 transition-colors"
+                                            style={{ animationDelay: `${index * 50}ms` }}
+                                        >
+                                            <div className="flex items-center gap-4">
+                                                <div className="w-10 h-10 rounded-xl bg-muted flex items-center justify-center font-mono text-xs font-bold text-muted-foreground">
+                                                    {inv.number === 'DRAFT' ? '...' : inv.number.slice(-3)}
                                                 </div>
                                                 <div>
-                                                    <div className="text-sm font-medium text-foreground">No invoices generated yet</div>
-                                                    <div className="text-xs text-muted-foreground mt-1">Create your first invoice to see it here.</div>
+                                                    <div className="font-semibold">{inv.to.name}</div>
+                                                    <div className="text-sm text-muted-foreground">
+                                                        {format(new Date(inv.date), 'MMM d, yyyy')}
+                                                    </div>
                                                 </div>
                                             </div>
-                                        </TableCell>
-                                    </TableRow>
-                                ) : (
-                                    recentInvoices.map((inv) => (
-                                        <TableRow key={inv.id} className="border-white/5 hover:bg-white/5 transition-colors">
-                                            <TableCell className="font-mono font-medium">{inv.number === 'DRAFT' ? 'Processing...' : inv.number}</TableCell>
-                                            <TableCell>{inv.to.name}</TableCell>
-                                            <TableCell className="text-muted-foreground text-xs">
-                                                {format(new Date(inv.date), 'MMM d, yyyy')}
-                                            </TableCell>
-                                            <TableCell className="font-medium">
-                                                {inv.total.toLocaleString()} <span className="text-xs text-muted-foreground">QAR</span>
-                                            </TableCell>
-                                            <TableCell className="text-right">
+                                            <div className="flex items-center gap-4">
+                                                <div className="text-right">
+                                                    <div className="font-bold">{(inv?.total || 0).toLocaleString()}</div>
+                                                    <div className="text-xs text-muted-foreground">QAR</div>
+                                                </div>
                                                 <Badge
-                                                    variant="secondary"
-                                                    className={`
-                                                        capitalize text-[10px] 
-                                                        ${inv.status === 'paid' ? 'bg-emerald-500/10 text-emerald-500' :
-                                                            inv.status === 'overdue' ? 'bg-red-500/10 text-red-500' :
-                                                                'bg-blue-500/10 text-blue-500'}
-                                                    `}
+                                                    variant={
+                                                        inv.status === 'paid' ? 'success' :
+                                                        inv.status === 'overdue' ? 'destructive' :
+                                                        'info'
+                                                    }
+                                                    className="capitalize"
                                                 >
                                                     {inv.status}
                                                 </Badge>
-                                            </TableCell>
-                                        </TableRow>
-                                    ))
-                                )}
-                            </TableBody>
-                        </Table>
-                    </CardContent>
-                </Card>
-
-                {/* Date-Based Aging Card */}
-                <Card className="col-span-3 bg-card/30 border-white/5 backdrop-blur-sm shadow-lg flex flex-col h-[600px]">
-                    <CardHeader className="pb-2 flex-none">
-                        <CardTitle className="flex items-center gap-2 text-base">
-                            <CalendarClock className="w-5 h-5 text-indigo-500" />
-                            Invoice Aging (Issuance)
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent className="flex-1 overflow-y-auto pr-2 space-y-6 pt-4 custom-scrollbar">
-                        {isLoading ? (
-                            <div className="text-center text-muted-foreground text-sm">Loading overdue list...</div>
-                        ) : stats.activeInvoices === 0 ? (
-                            <div className="flex flex-col items-center justify-center h-full text-center space-y-2">
-                                <div className="p-3 bg-emerald-500/10 rounded-full">
-                                    <AlertCircle className="w-6 h-6 text-emerald-500" />
-                                </div>
-                                <div className="text-sm font-medium text-emerald-500">All caught up!</div>
-                                <div className="text-xs text-muted-foreground">No overdue invoices.</div>
-                            </div>
-                        ) : (() => {
-                            // Helper to determine bucket
-                            const getBucket = (days: number) => {
-                                if (days <= 30) return '0 - 30 Days';
-                                if (days <= 60) return '31 - 60 Days';
-                                if (days <= 90) return '61 - 90 Days';
-                                return '90+ Days';
-                            };
-
-                            // Get Aging Invoices (Issuance Based)
-                            const agingInvoices = allInvoices
-                                .filter(inv => inv.status !== 'paid' && inv.status !== 'draft')
-                                .map(inv => {
-                                    // Age based on Issuance Date (inv.date)
-                                    const issueDate = new Date(inv.date);
-                                    const diffTime = new Date().getTime() - issueDate.getTime();
-                                    const ageDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-                                    return { ...inv, daysOverdue: ageDays, bucket: getBucket(ageDays) };
-                                });
-
-                            // Calculate stats per bucket
-                            const buckets = ['0 - 30 Days', '31 - 60 Days', '61 - 90 Days', '90+ Days'];
-                            const groupedInvoices = buckets.map(bucket => {
-                                const invoices = agingInvoices.filter(inv => inv.bucket === bucket).sort((a, b) => b.daysOverdue - a.daysOverdue);
-                                const total = invoices.reduce((acc, inv) => acc + inv.total, 0);
-                                return { bucket, invoices, total };
-                            });
-
-                            if (agingInvoices.length === 0) {
-                                return (
-                                    <div className="flex flex-col items-center justify-center h-full text-center space-y-2">
-                                        <div className="p-3 bg-emerald-500/10 rounded-full">
-                                            <AlertCircle className="w-6 h-6 text-emerald-500" />
+                                            </div>
                                         </div>
-                                        <div className="text-sm font-medium text-emerald-500">All caught up!</div>
-                                        <div className="text-xs text-muted-foreground">No overdue invoices found.</div>
+                                    ))}
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
+
+                    {/* Invoice Aging */}
+                    <Card className="lg:col-span-2">
+                        <CardHeader className="pb-4">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-rose-500 to-pink-600 flex items-center justify-center shadow-lg shadow-rose-500/20">
+                                    <CalendarClock className="w-5 h-5 text-white" />
+                                </div>
+                                <div>
+                                    <CardTitle>Invoice Aging</CardTitle>
+                                    <p className="text-sm text-muted-foreground">Outstanding balances</p>
+                                </div>
+                            </div>
+                        </CardHeader>
+                        <CardContent>
+                            {isLoading ? (
+                                <div className="flex items-center justify-center h-48 text-muted-foreground">
+                                    <div className="animate-pulse">Loading...</div>
+                                </div>
+                            ) : stats.activeInvoices === 0 ? (
+                                <div className="flex flex-col items-center justify-center h-48 text-center space-y-3">
+                                    <div className="w-14 h-14 rounded-2xl bg-emerald-50 flex items-center justify-center">
+                                        <CheckCircle2 className="w-7 h-7 text-emerald-500" />
+                                    </div>
+                                    <div>
+                                        <div className="font-semibold text-emerald-600">All caught up!</div>
+                                        <div className="text-sm text-muted-foreground mt-1">No outstanding invoices</div>
+                                    </div>
+                                </div>
+                            ) : (() => {
+                                const getBucket = (days: number) => {
+                                    if (days <= 30) return '0-30';
+                                    if (days <= 60) return '31-60';
+                                    if (days <= 90) return '61-90';
+                                    return '90+';
+                                };
+
+                                const agingInvoices = allInvoices
+                                    .filter(inv => inv.status !== 'paid' && inv.status !== 'draft')
+                                    .map(inv => {
+                                        const issueDate = new Date(inv.date);
+                                        const diffTime = new Date().getTime() - issueDate.getTime();
+                                        const ageDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+                                        return { ...inv, daysOverdue: ageDays, bucket: getBucket(ageDays) };
+                                    });
+
+                                const bucketConfig = [
+                                    { key: '0-30', label: '0-30 Days', color: 'from-blue-500 to-cyan-500', bg: 'bg-blue-50', text: 'text-blue-600' },
+                                    { key: '31-60', label: '31-60 Days', color: 'from-amber-500 to-yellow-500', bg: 'bg-amber-50', text: 'text-amber-600' },
+                                    { key: '61-90', label: '61-90 Days', color: 'from-orange-500 to-red-500', bg: 'bg-orange-50', text: 'text-orange-600' },
+                                    { key: '90+', label: '90+ Days', color: 'from-red-500 to-rose-600', bg: 'bg-red-50', text: 'text-red-600' },
+                                ];
+
+                                return (
+                                    <div className="space-y-3">
+                                        {bucketConfig.map(({ key, label, bg, text }) => {
+                                            const bucketInvoices = agingInvoices.filter(inv => inv.bucket === key);
+                                            const total = bucketInvoices.reduce((acc, inv) => acc + inv.total, 0);
+                                            if (bucketInvoices.length === 0) return null;
+
+                                            return (
+                                                <div key={key} className={`${bg} rounded-xl p-4`}>
+                                                    <div className="flex items-center justify-between mb-2">
+                                                        <span className={`text-sm font-semibold ${text}`}>{label}</span>
+                                                        <span className={`text-xs font-medium ${text}`}>{bucketInvoices.length} invoice{bucketInvoices.length > 1 ? 's' : ''}</span>
+                                                    </div>
+                                                    <div className={`text-2xl font-bold ${text}`}>
+                                                        {total.toLocaleString()} <span className="text-sm font-medium">QAR</span>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
                                     </div>
                                 );
-                            }
-
-                            return (
-                                <div className="space-y-8">
-                                    {groupedInvoices.map(({ bucket, invoices, total }) => {
-                                        if (invoices.length === 0) return null;
-
-                                        return (
-                                            <div key={bucket} className="space-y-3">
-                                                <div className="flex items-center justify-between border-b border-white/5 pb-2">
-                                                    <h4 className="text-sm font-semibold text-muted-foreground">{bucket}</h4>
-                                                    <span className="text-xs font-mono text-muted-foreground">
-                                                        Total: <span className="text-foreground font-semibold">{total.toLocaleString()}</span> QAR
-                                                    </span>
-                                                </div>
-                                                <div className="space-y-2">
-                                                    {invoices.map(inv => (
-                                                        <div key={inv.id} className="flex items-center justify-between p-2 rounded-lg bg-white/5 hover:bg-white/10 transition-colors group">
-                                                            <div className="flex items-center gap-3">
-                                                                <div className={`
-                                                                    flex flex-col items-center justify-center w-8 h-8 rounded shrink-0 border transition-colors
-                                                                    ${bucket === '90+ Days' ? 'bg-red-500/10 border-red-500/20 text-red-500' :
-                                                                        bucket === '61 - 90 Days' ? 'bg-orange-500/10 border-orange-500/20 text-orange-500' :
-                                                                            bucket === '31 - 60 Days' ? 'bg-amber-500/10 border-amber-500/20 text-amber-500' :
-                                                                                'bg-blue-500/10 border-blue-500/20 text-blue-500'}
-                                                                `}>
-                                                                    <span className="text-[10px] font-bold">{inv.daysOverdue}</span>
-                                                                    <span className="text-[6px] uppercase leading-none opacity-70">Days</span>
-                                                                </div>
-                                                                <div className="flex flex-col min-w-0">
-                                                                    <span className="text-sm font-medium truncate max-w-[120px]" title={inv.to.name}>{inv.to.name}</span>
-                                                                    <span className="text-[10px] text-muted-foreground font-mono">{inv.number === 'DRAFT' ? 'Gen...' : inv.number}</span>
-                                                                </div>
-                                                            </div>
-                                                            <div className="text-right shrink-0">
-                                                                <div className="text-sm font-mono font-medium">{inv.total.toLocaleString()}</div>
-                                                                <div className="text-[10px] text-muted-foreground">
-                                                                    {inv.dueDate ? format(new Date(inv.dueDate), 'MMM d') : 'N/A'}
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            );
-                        })()}
-                    </CardContent>
-                </Card>
+                            })()}
+                        </CardContent>
+                    </Card>
+                </div>
             </div>
         </div>
     );
