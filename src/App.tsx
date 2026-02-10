@@ -12,11 +12,11 @@ const InvoicePrintView = lazy(() => import('@/components/invoicing/InvoicePrintV
 const Dashboard = lazy(() => import('@/components/dashboard/Dashboard').then(m => ({ default: m.Dashboard })));
 
 type Module = 'dashboard' | 'matcher' | 'invoicing' | 'customers' | 'settings';
-type MatcherStep = 'configure' | 'done';
+type MatcherStep = 'upload' | 'configure' | 'done';
 
 function App() {
   const [activeModule, setActiveModule] = useState<Module>('dashboard');
-  const [matcherStep, setMatcherStep] = useState<MatcherStep>('configure');
+  const [matcherStep, setMatcherStep] = useState<MatcherStep>('upload');
 
   // Check for print mode - HACK: simple routing
   const urlParams = new URLSearchParams(window.location.search);

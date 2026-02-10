@@ -3,9 +3,9 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Check, Files, Loader2, Trash2, AlertCircle, Upload, Plus, Sparkles } from 'lucide-react';
+import { Check, Loader2, Trash2, AlertCircle, Sparkles, ArrowLeft, FileSpreadsheet } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import type { FileAnalysis } from '../../types.d';
+import type { FileAnalysis, Customer } from '../../types.d';
 
 interface FileConfig extends FileAnalysis {
     matchLabel?: string;
@@ -17,273 +17,238 @@ interface MatcherConfigureViewProps {
     masterConfig: FileConfig | null;
     targetConfigs: FileConfig[];
     noMatchLabel: string;
-    isAnalyzing: boolean;
     isProcessing: boolean;
     isReady: boolean;
+    customers: Customer[];
     setNoMatchLabel: (label: string) => void;
     setMasterConfig: React.Dispatch<React.SetStateAction<FileConfig | null>>;
-    handleSelectMaster: () => void;
-    handleSelectTargets: () => void;
+    setTargetConfigs: React.Dispatch<React.SetStateAction<FileConfig[]>>;
     removeTarget: (index: number) => void;
-    setMappingTarget: (target: { type: 'master' | 'target'; index: number }) => void;
-    setMapperOpen: (open: boolean) => void;
     handleProcess: () => void;
+    onBack: () => void;
 }
 
 export default function MatcherConfigureView({
     masterConfig,
     targetConfigs,
     noMatchLabel,
-    isAnalyzing,
     isProcessing,
     isReady,
+    customers,
     setNoMatchLabel,
     setMasterConfig,
-    handleSelectMaster,
-    handleSelectTargets,
+    setTargetConfigs,
     removeTarget,
-    setMappingTarget,
-    setMapperOpen,
-    handleProcess
+    handleProcess,
+    onBack,
 }: MatcherConfigureViewProps) {
-    return (
-        <div className="max-w-5xl mx-auto space-y-8">
-            {/* File Selection Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Master File Card */}
-                <div
-                    onClick={handleSelectMaster}
-                    className={cn(
-                        "group relative cursor-pointer rounded-3xl p-8 transition-all duration-300",
-                        "border-2 border-dashed hover:border-solid",
-                        masterConfig 
-                            ? "bg-gradient-to-br from-emerald-50 to-teal-50 border-emerald-300 shadow-lg shadow-emerald-500/10" 
-                            : "bg-muted/30 border-border hover:border-emerald-400 hover:bg-emerald-50/50"
-                    )}
-                >
-                    <div className="flex flex-col items-center text-center space-y-5">
-                        <div className={cn(
-                            "w-20 h-20 rounded-2xl flex items-center justify-center transition-all duration-300",
-                            masterConfig 
-                                ? "bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-xl shadow-emerald-500/30" 
-                                : "bg-muted text-muted-foreground group-hover:bg-emerald-100 group-hover:text-emerald-600"
-                        )}>
-                            {masterConfig ? <Check className="w-10 h-10" /> : <Upload className="w-10 h-10" />}
-                        </div>
-                        <div>
-                            <h3 className="text-xl font-bold mb-1">
-                                {masterConfig ? 'Master File Ready' : 'Upload Master File'}
-                            </h3>
-                            {masterConfig ? (
-                                <Badge className="bg-emerald-100 text-emerald-700 border-0">{masterConfig.fileName}</Badge>
-                            ) : (
-                                <p className="text-sm text-muted-foreground">Click to select your main Excel file</p>
-                            )}
-                        </div>
-                    </div>
-                </div>
+    if (!masterConfig) return null;
 
-                {/* Customer Files Card */}
-                <div
-                    onClick={handleSelectTargets}
-                    className={cn(
-                        "group relative cursor-pointer rounded-3xl p-8 transition-all duration-300",
-                        "border-2 border-dashed hover:border-solid",
-                        targetConfigs.length > 0 
-                            ? "bg-gradient-to-br from-violet-50 to-purple-50 border-violet-300 shadow-lg shadow-violet-500/10" 
-                            : "bg-muted/30 border-border hover:border-violet-400 hover:bg-violet-50/50"
-                    )}
-                >
-                    <div className="flex flex-col items-center text-center space-y-5">
-                        <div className={cn(
-                            "w-20 h-20 rounded-2xl flex items-center justify-center transition-all duration-300",
-                            targetConfigs.length > 0 
-                                ? "bg-gradient-to-br from-violet-500 to-purple-600 text-white shadow-xl shadow-violet-500/30" 
-                                : "bg-muted text-muted-foreground group-hover:bg-violet-100 group-hover:text-violet-600"
-                        )}>
-                            {targetConfigs.length > 0 ? <Files className="w-10 h-10" /> : <Plus className="w-10 h-10" />}
-                        </div>
-                        <div>
-                            <h3 className="text-xl font-bold mb-1">
-                                {targetConfigs.length > 0 ? `${targetConfigs.length} Files Added` : 'Add Customer Files'}
-                            </h3>
-                            {targetConfigs.length > 0 ? (
-                                <Badge className="bg-violet-100 text-violet-700 border-0">Click to add more</Badge>
-                            ) : (
-                                <p className="text-sm text-muted-foreground">Click to select customer Excel files</p>
-                            )}
-                        </div>
+    const updateTarget = (index: number, updates: Partial<FileConfig>) => {
+        setTargetConfigs(prev => prev.map((c, i) => i === index ? { ...c, ...updates } : c));
+    };
+
+    return (
+        <div className="max-w-3xl mx-auto space-y-5">
+            {/* Step indicator */}
+            <div className="flex items-center gap-2 text-sm text-muted-foreground justify-center">
+                <div className="flex items-center gap-1.5 text-emerald-600">
+                    <div className="w-5 h-5 rounded-full bg-emerald-500 text-white flex items-center justify-center text-xs font-bold">
+                        <Check className="w-3 h-3" />
                     </div>
+                    Upload
+                </div>
+                <div className="w-8 h-px bg-emerald-400" />
+                <div className="flex items-center gap-1.5 text-primary font-semibold">
+                    <div className="w-5 h-5 rounded-full bg-primary text-white flex items-center justify-center text-xs font-bold">2</div>
+                    Configure
+                </div>
+                <div className="w-8 h-px bg-border" />
+                <div className="flex items-center gap-1.5 opacity-40">
+                    <div className="w-5 h-5 rounded-full bg-muted text-muted-foreground flex items-center justify-center text-xs font-bold">3</div>
+                    Process
                 </div>
             </div>
 
-            {/* Loading State */}
-            {isAnalyzing && (
-                <div className="flex items-center justify-center gap-3 py-6">
-                    <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
-                        <Loader2 className="w-5 h-5 animate-spin text-primary" />
-                    </div>
-                    <span className="text-sm font-medium text-muted-foreground">Analyzing files...</span>
-                </div>
-            )}
+            {/* Back button */}
+            <Button variant="ghost" size="sm" onClick={onBack} className="gap-1.5 text-muted-foreground -ml-2">
+                <ArrowLeft className="w-3.5 h-3.5" />
+                Back to Files
+            </Button>
 
-            {/* Configuration Card */}
-            {masterConfig && (
-                <Card className="overflow-hidden">
-                    <CardHeader className="bg-gradient-to-r from-muted/50 to-muted/30 border-b border-border/50">
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-emerald-600 flex items-center justify-center">
-                                    <Sparkles className="w-5 h-5 text-white" />
-                                </div>
-                                <div>
-                                    <CardTitle>Configuration</CardTitle>
-                                    <p className="text-sm text-muted-foreground">Set up column mappings</p>
-                                </div>
+            {/* Master File Config */}
+            <Card className="overflow-hidden">
+                <CardHeader className="bg-gradient-to-r from-indigo-50/80 to-indigo-100/30 border-b border-indigo-200/50">
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-lg bg-indigo-500 flex items-center justify-center">
+                                <FileSpreadsheet className="w-4 h-4 text-white" />
                             </div>
-                            <Badge variant="muted" className="text-sm">
-                                {masterConfig?.dataRowCount} rows
-                            </Badge>
+                            <div>
+                                <CardTitle className="text-indigo-800">Master File</CardTitle>
+                                <p className="text-xs text-indigo-600/70">{masterConfig.fileName}</p>
+                            </div>
                         </div>
-                    </CardHeader>
-                    <CardContent className="p-6 space-y-6">
-                        {/* Master File Config */}
-                        <div className="p-5 rounded-2xl bg-emerald-50/50 border border-emerald-200/50 space-y-4">
+                        <Badge className="bg-indigo-100 text-indigo-700 border-0">
+                            {masterConfig.dataRowCount} rows
+                        </Badge>
+                    </div>
+                </CardHeader>
+                <CardContent className="p-4">
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-1.5">
+                            <label className="text-xs font-semibold uppercase tracking-wider text-indigo-700">Ticket / ID Column</label>
+                            <select
+                                className={cn(
+                                    "w-full h-9 rounded-lg border-2 bg-white px-3 text-sm font-medium focus:ring-4 transition-all",
+                                    masterConfig.overrideIdColumn !== undefined && masterConfig.overrideIdColumn !== -1
+                                        ? "border-indigo-300 focus:border-indigo-500 focus:ring-indigo-500/10"
+                                        : "border-rose-300 focus:border-rose-500 focus:ring-rose-500/10"
+                                )}
+                                value={masterConfig.overrideIdColumn ?? -1}
+                                onChange={(e) => {
+                                    const val = parseInt(e.target.value);
+                                    setMasterConfig(prev => prev ? {
+                                        ...prev,
+                                        overrideIdColumn: val === -1 ? undefined : val
+                                    } : null);
+                                }}
+                            >
+                                <option value={-1}>Select Column...</option>
+                                {masterConfig.headers?.map(h => (
+                                    <option key={h.index} value={h.index}>{h.name}</option>
+                                ))}
+                            </select>
+                        </div>
+                        <div className="space-y-1.5">
+                            <label className="text-xs font-semibold uppercase tracking-wider text-indigo-700">Output / Result Column</label>
+                            <select
+                                className={cn(
+                                    "w-full h-9 rounded-lg border-2 bg-white px-3 text-sm font-medium focus:ring-4 transition-all",
+                                    masterConfig.overrideResultColumn !== undefined && masterConfig.overrideResultColumn !== -1
+                                        ? "border-indigo-300 focus:border-indigo-500 focus:ring-indigo-500/10"
+                                        : "border-rose-300 focus:border-rose-500 focus:ring-rose-500/10"
+                                )}
+                                value={masterConfig.overrideResultColumn ?? -1}
+                                onChange={(e) => {
+                                    const val = parseInt(e.target.value);
+                                    setMasterConfig(prev => prev ? {
+                                        ...prev,
+                                        overrideResultColumn: val === -1 ? undefined : val
+                                    } : null);
+                                }}
+                            >
+                                <option value={-1}>
+                                    Auto ({masterConfig.resultColumn?.isNew ? 'New Column' : masterConfig.resultColumn?.name})
+                                </option>
+                                {masterConfig.headers?.map(h => (
+                                    <option key={h.index} value={h.index}>{h.name}</option>
+                                ))}
+                            </select>
+                        </div>
+                    </div>
+                </CardContent>
+            </Card>
+
+            {/* Target Files Config */}
+            <Card className="overflow-hidden">
+                <CardHeader className="bg-gradient-to-r from-indigo-50/60 to-indigo-100/20 border-b border-indigo-200/50">
+                    <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-lg bg-indigo-500 flex items-center justify-center">
+                            <FileSpreadsheet className="w-4 h-4 text-white" />
+                        </div>
+                        <div>
+                            <CardTitle className="text-indigo-800">Customer Files</CardTitle>
+                            <p className="text-xs text-indigo-600/70">{targetConfigs.length} file{targetConfigs.length !== 1 ? 's' : ''} to configure</p>
+                        </div>
+                    </div>
+                </CardHeader>
+                <CardContent className="p-4 space-y-3">
+                    {targetConfigs.map((target, idx) => (
+                        <div key={idx} className="p-3 rounded-lg bg-indigo-50/30 border border-indigo-200/50 space-y-3">
                             <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-3">
-                                    <div className="w-8 h-8 rounded-lg bg-emerald-500 flex items-center justify-center">
-                                        <Check className="w-4 h-4 text-white" />
+                                <div className="flex items-center gap-2.5">
+                                    <div className="w-6 h-6 rounded-md bg-indigo-500 flex items-center justify-center text-white text-xs font-bold">
+                                        {idx + 1}
                                     </div>
-                                    <span className="font-bold text-emerald-800">{masterConfig.fileName}</span>
+                                    <span className="font-semibold text-sm text-indigo-800 truncate">{target.fileName}</span>
+                                    <span className="text-xs text-muted-foreground">{target.dataRowCount} rows</span>
                                 </div>
-                                <Badge className="bg-emerald-100 text-emerald-700 border-0">Master</Badge>
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-7 w-7 text-muted-foreground hover:text-destructive hover:bg-red-50"
+                                    onClick={() => removeTarget(idx)}
+                                >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                </Button>
                             </div>
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-2">
-                                    <label className="text-sm font-semibold text-emerald-700">ID Column</label>
+                            <div className="grid grid-cols-2 gap-3">
+                                <div className="space-y-1.5">
+                                    <label className="text-xs font-semibold text-indigo-700">Description / ID Column</label>
                                     <select
-                                        className="w-full h-11 rounded-xl border-2 border-emerald-200 bg-white px-4 text-sm font-medium focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 transition-all"
-                                        value={masterConfig.overrideIdColumn ?? -1}
+                                        className={cn(
+                                            "w-full h-9 rounded-lg border-2 bg-white px-3 text-sm font-medium focus:ring-4 transition-all",
+                                            target.overrideIdColumn !== undefined && target.overrideIdColumn !== -1
+                                                ? "border-indigo-200 focus:border-indigo-500 focus:ring-indigo-500/10"
+                                                : "border-rose-300 focus:border-rose-500 focus:ring-rose-500/10"
+                                        )}
+                                        value={target.overrideIdColumn ?? -1}
                                         onChange={(e) => {
                                             const val = parseInt(e.target.value);
-                                            setMasterConfig(prev => prev ? {
-                                                ...prev,
-                                                overrideIdColumn: val === -1 ? undefined : val
-                                            } : null);
+                                            updateTarget(idx, { overrideIdColumn: val === -1 ? undefined : val });
                                         }}
                                     >
                                         <option value={-1}>Select Column...</option>
-                                        {masterConfig?.headers?.map(h => (
+                                        {target.headers?.map(h => (
                                             <option key={h.index} value={h.index}>{h.name}</option>
                                         ))}
                                     </select>
                                 </div>
-                                <div className="space-y-2">
-                                    <label className="text-sm font-semibold text-emerald-700">Output Column</label>
+                                <div className="space-y-1.5">
+                                    <label className="text-xs font-semibold text-indigo-700">Customer Label</label>
                                     <select
-                                        className="w-full h-11 rounded-xl border-2 border-emerald-200 bg-white px-4 text-sm font-medium focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 transition-all"
-                                        value={masterConfig.overrideResultColumn ?? -1}
-                                        onChange={(e) => {
-                                            const val = parseInt(e.target.value);
-                                            setMasterConfig(prev => prev ? {
-                                                ...prev,
-                                                overrideResultColumn: val === -1 ? undefined : val
-                                            } : null);
-                                        }}
+                                        className={cn(
+                                            "w-full h-9 rounded-lg border-2 bg-white px-3 text-sm font-medium focus:ring-4 transition-all",
+                                            target.matchLabel
+                                                ? "border-indigo-200 focus:border-indigo-500 focus:ring-indigo-500/10"
+                                                : "border-rose-300 focus:border-rose-500 focus:ring-rose-500/10"
+                                        )}
+                                        value={target.matchLabel || ''}
+                                        onChange={(e) => updateTarget(idx, { matchLabel: e.target.value || undefined })}
                                     >
-                                        <option value={-1}>
-                                            Auto ({masterConfig.resultColumn?.isNew ? 'New Column' : masterConfig.resultColumn?.name})
-                                        </option>
-                                        {masterConfig.headers?.map(h => (
-                                            <option key={h.index} value={h.index}>{h.name}</option>
+                                        <option value="">Select Customer...</option>
+                                        {customers.map(c => (
+                                            <option key={c.id} value={c.name}>{c.name}</option>
                                         ))}
                                     </select>
                                 </div>
                             </div>
                         </div>
+                    ))}
 
-                        {/* Target Files */}
-                        {targetConfigs.map((target, idx) => (
-                            <div key={idx} className="p-5 rounded-2xl bg-violet-50/50 border border-violet-200/50 space-y-4">
-                                <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-8 h-8 rounded-lg bg-violet-500 flex items-center justify-center text-white text-sm font-bold">
-                                            {idx + 1}
-                                        </div>
-                                        <span className="font-bold text-violet-800">{target.fileName}</span>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            className="h-8 gap-2 text-violet-600 hover:bg-violet-100"
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                setMappingTarget({ type: 'target', index: idx });
-                                                setMapperOpen(true);
-                                            }}
-                                        >
-                                            <Sparkles className="w-3.5 h-3.5" />
-                                            Configure
-                                        </Button>
-                                        <Button
-                                            variant="ghost"
-                                            size="icon"
-                                            className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-red-50"
-                                            onClick={(e) => { e.stopPropagation(); removeTarget(idx); }}
-                                        >
-                                            <Trash2 className="w-4 h-4" />
-                                        </Button>
-                                    </div>
-                                </div>
-                                <div className="flex items-center gap-4 p-3 bg-white/80 rounded-xl border border-violet-100">
-                                    <div className="flex-1">
-                                        <span className="text-xs text-muted-foreground">ID Column</span>
-                                        <div className="font-semibold text-sm">
-                                            {target.overrideIdColumn !== undefined
-                                                ? (target.headers?.find(h => h.index === target.overrideIdColumn)?.name || `Col ${target.overrideIdColumn + 1}`)
-                                                : <span className="text-muted-foreground">Not set</span>
-                                            }
-                                        </div>
-                                    </div>
-                                    <div className="w-px h-8 bg-violet-200" />
-                                    <div className="flex-1">
-                                        <span className="text-xs text-muted-foreground">Customer Label</span>
-                                        <div className="font-semibold text-sm">
-                                            {target.matchLabel ? (
-                                                <span className="text-violet-700">{target.matchLabel}</span>
-                                            ) : (
-                                                <span className="text-red-500">Required</span>
-                                            )}
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        ))}
-
-                        {/* No Match Label */}
-                        <div className="flex items-center gap-4 p-4 rounded-2xl bg-muted/50 border border-border/50">
-                            <span className="text-sm font-semibold text-muted-foreground whitespace-nowrap">Unmatched label:</span>
-                            <Input
-                                className="flex-1 max-w-xs"
-                                value={noMatchLabel}
-                                onChange={(e) => setNoMatchLabel(e.target.value)}
-                                placeholder="e.g., Not Matched"
-                            />
-                        </div>
-                    </CardContent>
-                </Card>
-            )}
+                    {/* No Match Label */}
+                    <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50 border border-border/50">
+                        <span className="text-xs font-semibold text-muted-foreground whitespace-nowrap">Unmatched label:</span>
+                        <Input
+                            className="flex-1 max-w-xs"
+                            value={noMatchLabel}
+                            onChange={(e) => setNoMatchLabel(e.target.value)}
+                            placeholder="e.g., Not Matched"
+                        />
+                    </div>
+                </CardContent>
+            </Card>
 
             {/* Process Button */}
-            <div className="flex flex-col items-center gap-4 pt-8 pb-4">
+            <div className="flex flex-col items-center gap-3 pt-3 pb-3">
                 <Button
                     size="xl"
                     disabled={!isReady || isProcessing}
                     onClick={handleProcess}
                     className={cn(
-                        "min-w-80 text-lg gap-3 transition-transform duration-300 ease-out",
-                        isReady && !isProcessing && "animate-bounce-once"
+                        "min-w-56 gap-2 transition-transform duration-300 ease-out",
+                        isReady && !isProcessing && "shadow-lg shadow-primary/20"
                     )}
                 >
                     {isProcessing ? (
@@ -299,14 +264,14 @@ export default function MatcherConfigureView({
                     )}
                 </Button>
 
-                {!isReady && masterConfig && (
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <AlertCircle className="w-4 h-4" />
+                {!isReady && (
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <AlertCircle className="w-3.5 h-3.5" />
                         <span>
-                            {masterConfig.overrideIdColumn === undefined && 'Select master ID column. '}
-                            {masterConfig.overrideResultColumn === undefined && 'Select output column. '}
-                            {targetConfigs.length === 0 && 'Add customer files. '}
-                            {targetConfigs.some(t => !t.matchLabel) && 'Configure all customer files.'}
+                            {(masterConfig.overrideIdColumn === undefined || masterConfig.overrideIdColumn === -1) && 'Select master ID column. '}
+                            {(masterConfig.overrideResultColumn === undefined || masterConfig.overrideResultColumn === -1) && 'Select output column. '}
+                            {targetConfigs.some(t => !t.overrideIdColumn || t.overrideIdColumn === -1) && 'Set ID columns for all files. '}
+                            {targetConfigs.some(t => !t.matchLabel) && 'Assign customers to all files.'}
                         </span>
                     </div>
                 )}

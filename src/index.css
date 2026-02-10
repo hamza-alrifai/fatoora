@@ -10,60 +10,59 @@
 
 @theme {
     /* ══════════════════════════════════════════════════════════════════
-       CANVAS - The foundation everything sits on
+       CANVAS
        ══════════════════════════════════════════════════════════════════ */
-    --color-background: #fafbfc;
-    --color-foreground: #1a1d26;
+    --color-background: #f8fafc;
+    --color-foreground: #0f172a;
     
     /* ══════════════════════════════════════════════════════════════════
-       SURFACES - Cards, panels, elevated elements
+       SURFACES
        ══════════════════════════════════════════════════════════════════ */
     --color-card: #ffffff;
-    --color-card-foreground: #1a1d26;
+    --color-card-foreground: #0f172a;
     --color-popover: #ffffff;
-    --color-popover-foreground: #1a1d26;
+    --color-popover-foreground: #0f172a;
     
     /* ══════════════════════════════════════════════════════════════════
-       PRIMARY - Vibrant green for actions & success
-       A fresh, modern green that pops without being aggressive
+       PRIMARY - Indigo: the brand identity
        ══════════════════════════════════════════════════════════════════ */
-    --color-primary: #10b981;
+    --color-primary: #6366f1;
     --color-primary-foreground: #ffffff;
-    --color-primary-hover: #059669;
-    --color-primary-light: #d1fae5;
-    --color-primary-muted: #ecfdf5;
+    --color-primary-hover: #4f46e5;
+    --color-primary-light: #e0e7ff;
+    --color-primary-muted: #eef2ff;
     
     /* ══════════════════════════════════════════════════════════════════
-       SECONDARY - Modern blue for navigation & info
+       SECONDARY - Emerald: positive actions, success
        ══════════════════════════════════════════════════════════════════ */
-    --color-secondary: #6366f1;
+    --color-secondary: #10b981;
     --color-secondary-foreground: #ffffff;
-    --color-secondary-hover: #4f46e5;
-    --color-secondary-light: #e0e7ff;
-    --color-secondary-muted: #eef2ff;
+    --color-secondary-hover: #059669;
+    --color-secondary-light: #d1fae5;
+    --color-secondary-muted: #ecfdf5;
 
     /* ══════════════════════════════════════════════════════════════════
-       ACCENT - Warm gradient accent for highlights
+       ACCENT - Soft indigo tint for highlights
        ══════════════════════════════════════════════════════════════════ */
-    --color-accent: #f0fdf4;
-    --color-accent-foreground: #065f46;
+    --color-accent: #eef2ff;
+    --color-accent-foreground: #3730a3;
     
     /* ══════════════════════════════════════════════════════════════════
-       NEUTRAL PALETTE - Sophisticated grays
+       NEUTRAL PALETTE
        ══════════════════════════════════════════════════════════════════ */
     --color-muted: #f1f5f9;
     --color-muted-foreground: #64748b;
     
     /* ══════════════════════════════════════════════════════════════════
-       SEMANTIC STATES - Clear visual feedback
+       SEMANTIC STATES
        ══════════════════════════════════════════════════════════════════ */
     --color-success: #10b981;
     --color-success-light: #d1fae5;
     --color-warning: #f59e0b;
     --color-warning-light: #fef3c7;
-    --color-destructive: #ef4444;
+    --color-destructive: #f43f5e;
     --color-destructive-foreground: #ffffff;
-    --color-destructive-light: #fee2e2;
+    --color-destructive-light: #ffe4e6;
     --color-info: #6366f1;
     --color-info-light: #e0e7ff;
 
@@ -74,16 +73,16 @@
     --color-border-strong: #cbd5e1;
     --color-input: #ffffff;
     --color-input-border: #e2e8f0;
-    --color-ring: #10b981;
-    --color-ring-secondary: #6366f1;
+    --color-ring: #6366f1;
+    --color-ring-secondary: #10b981;
 
     /* ══════════════════════════════════════════════════════════════════
-       SIDEBAR - Clean white sidebar with subtle depth
+       SIDEBAR
        ══════════════════════════════════════════════════════════════════ */
     --color-sidebar: #ffffff;
-    --color-sidebar-foreground: #1a1d26;
+    --color-sidebar-foreground: #0f172a;
     --color-sidebar-muted: #f8fafc;
-    --color-sidebar-accent: #10b981;
+    --color-sidebar-accent: #6366f1;
     --color-sidebar-border: #f1f5f9;
 
     /* ═══════════════════════════════════════════════════════════════════════════
@@ -93,7 +92,7 @@
     --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
 
     /* ═══════════════════════════════════════════════════════════════════════════
-       RADII - Generous, modern rounding
+       RADII
        ═══════════════════════════════════════════════════════════════════════════ */
     --radius-sm: 0.5rem;
     --radius-md: 0.75rem;
@@ -103,15 +102,15 @@
     --radius-full: 9999px;
 
     /* ══════════════════════════════════════════════════════════════════
-       SHADOWS - Soft, layered depth
+       SHADOWS - Indigo-tinted depth
        ══════════════════════════════════════════════════════════════════ */
-    --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.04);
-    --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.06);
-    --shadow-md: 0 4px 8px rgba(0, 0, 0, 0.04), 0 2px 4px rgba(0, 0, 0, 0.06);
-    --shadow-lg: 0 12px 24px rgba(0, 0, 0, 0.06), 0 4px 8px rgba(0, 0, 0, 0.04);
-    --shadow-xl: 0 20px 40px rgba(0, 0, 0, 0.08), 0 8px 16px rgba(0, 0, 0, 0.04);
-    --shadow-glow: 0 0 0 3px rgba(16, 185, 129, 0.15);
-    --shadow-glow-secondary: 0 0 0 3px rgba(99, 102, 241, 0.15);
+    --shadow-xs: 0 1px 2px rgba(15, 23, 42, 0.04);
+    --shadow-sm: 0 2px 4px rgba(15, 23, 42, 0.04), 0 1px 2px rgba(15, 23, 42, 0.06);
+    --shadow-md: 0 4px 8px rgba(15, 23, 42, 0.04), 0 2px 4px rgba(15, 23, 42, 0.06);
+    --shadow-lg: 0 12px 24px rgba(15, 23, 42, 0.06), 0 4px 8px rgba(15, 23, 42, 0.04);
+    --shadow-xl: 0 20px 40px rgba(15, 23, 42, 0.08), 0 8px 16px rgba(15, 23, 42, 0.04);
+    --shadow-glow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+    --shadow-glow-secondary: 0 0 0 3px rgba(16, 185, 129, 0.15);
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -124,16 +123,16 @@
     --color-card-foreground: #f8fafc;
     --color-popover: #1a1f2e;
     --color-popover-foreground: #f8fafc;
-    --color-primary: #34d399;
-    --color-primary-foreground: #022c22;
-    --color-primary-hover: #10b981;
-    --color-primary-light: #064e3b;
-    --color-primary-muted: #022c22;
-    --color-secondary: #818cf8;
-    --color-secondary-foreground: #1e1b4b;
-    --color-secondary-hover: #6366f1;
-    --color-secondary-light: #312e81;
-    --color-secondary-muted: #1e1b4b;
+    --color-primary: #818cf8;
+    --color-primary-foreground: #1e1b4b;
+    --color-primary-hover: #6366f1;
+    --color-primary-light: #312e81;
+    --color-primary-muted: #1e1b4b;
+    --color-secondary: #34d399;
+    --color-secondary-foreground: #022c22;
+    --color-secondary-hover: #10b981;
+    --color-secondary-light: #064e3b;
+    --color-secondary-muted: #022c22;
     --color-muted: #1e293b;
     --color-muted-foreground: #94a3b8;
     --color-border: #1e293b;
@@ -141,7 +140,7 @@
     --color-sidebar: #0c0f17;
     --color-sidebar-foreground: #f8fafc;
     --color-sidebar-muted: #151922;
-    --color-sidebar-accent: #34d399;
+    --color-sidebar-accent: #818cf8;
     --color-sidebar-border: #1e293b;
 }
 
@@ -166,22 +165,22 @@ body {
     margin: 0;
     padding: 0;
     overflow: hidden;
-    font-size: 22px;
-    line-height: 1.6;
+    font-size: 14px;
+    line-height: 1.5;
     letter-spacing: -0.01em;
     font-weight: 500;
 }
 
-.text-xs { font-size: 16px !important; }
-.text-sm { font-size: 18px !important; }
-.text-base { font-size: 20px !important; }
-.text-lg { font-size: 22px !important; }
-.text-xl { font-size: 24px !important; }
-.text-2xl { font-size: 28px !important; }
-.text-3xl { font-size: 34px !important; }
-.text-4xl { font-size: 40px !important; }
-.text-5xl { font-size: 50px !important; }
-.text-6xl { font-size: 62px !important; }
+.text-xs { font-size: 11px !important; }
+.text-sm { font-size: 13px !important; }
+.text-base { font-size: 14px !important; }
+.text-lg { font-size: 16px !important; }
+.text-xl { font-size: 18px !important; }
+.text-2xl { font-size: 22px !important; }
+.text-3xl { font-size: 26px !important; }
+.text-4xl { font-size: 32px !important; }
+.text-5xl { font-size: 40px !important; }
+.text-6xl { font-size: 50px !important; }
 
 /* Custom animation for button ready state */
 @keyframes bounce-once {
@@ -263,9 +262,9 @@ img, a, button {
 }
 
 @keyframes pulse-ring {
-    0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4); }
-    70% { box-shadow: 0 0 0 10px rgba(16, 185, 129, 0); }
-    100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+    0% { box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.4); }
+    70% { box-shadow: 0 0 0 10px rgba(99, 102, 241, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(99, 102, 241, 0); }
 }
 
 .animate-in {
@@ -296,7 +295,7 @@ img, a, button {
 .page-container {
     max-width: 1440px;
     margin: 0 auto;
-    padding: 2rem 2.5rem;
+    padding: 1.25rem 1.5rem;
     height: 100%;
     display: flex;
     flex-direction: column;

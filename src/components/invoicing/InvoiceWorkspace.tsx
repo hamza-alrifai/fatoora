@@ -139,35 +139,35 @@ export function InvoiceWorkspace({ onNavigate }: InvoiceWorkspaceProps) {
     // LIST MODE
     return (
         <div className="h-full bg-background overflow-y-auto">
-            <div className="max-w-[1600px] mx-auto px-8 py-8">
+            <div className="max-w-[1400px] mx-auto px-5 py-5">
                 {/* Header */}
-                <div className="flex items-center justify-between mb-8">
+                <div className="flex items-center justify-between mb-5">
                     <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-500/20">
-                            <Receipt className="w-6 h-6 text-white" />
+                        <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 to-indigo-600 flex items-center justify-center shadow-md shadow-indigo-500/20">
+                            <Receipt className="w-4 h-4 text-white" />
                         </div>
                         <div>
-                            <h1 className="text-2xl font-bold tracking-tight">Invoices</h1>
+                            <h1 className="text-xl font-bold tracking-tight">Invoices</h1>
                             <p className="text-sm text-muted-foreground">View, edit, and print invoices</p>
                         </div>
                     </div>
                 </div>
 
                 {/* Stats Cards */}
-                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 mb-8">
-                    <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-blue-500 to-indigo-600 p-6 text-white shadow-xl shadow-blue-500/20">
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 mb-5">
+                    <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-indigo-500 to-indigo-600 p-4 text-white shadow-lg shadow-indigo-500/20">
                         <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2" />
                         <div className="relative">
                             <div className="flex items-center gap-3 mb-3">
                                 <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
                                     <TrendingUp className="w-5 h-5" />
                                 </div>
-                                <span className="text-blue-100 font-medium">Total Revenue</span>
+                                <span className="text-indigo-200 font-medium">Total Revenue</span>
                             </div>
-                            <div className="text-3xl font-bold">{totalRevenue.toLocaleString(undefined, { maximumFractionDigits: 0 })} <span className="text-lg font-normal text-blue-200">QAR</span></div>
+                            <div className="text-2xl font-bold">{totalRevenue.toLocaleString(undefined, { maximumFractionDigits: 0 })} <span className="text-sm font-normal text-indigo-200">QAR</span></div>
                         </div>
                     </div>
-                    <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-amber-500 to-orange-600 p-6 text-white shadow-xl shadow-amber-500/20">
+                    <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-amber-500 to-amber-600 p-4 text-white shadow-lg shadow-amber-500/20">
                         <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2" />
                         <div className="relative">
                             <div className="flex items-center gap-3 mb-3">
@@ -176,14 +176,14 @@ export function InvoiceWorkspace({ onNavigate }: InvoiceWorkspaceProps) {
                                 </div>
                                 <span className="text-amber-100 font-medium">Pending</span>
                             </div>
-                            <div className="text-3xl font-bold">{pendingInvoices} <span className="text-lg font-normal text-amber-200">invoices</span></div>
+                            <div className="text-2xl font-bold">{pendingInvoices} <span className="text-sm font-normal text-amber-200">invoices</span></div>
                         </div>
                     </div>
                 </div>
 
                 {/* Invoice List */}
                 <Card className="overflow-hidden">
-                    <div className="p-5 border-b border-border/50 flex items-center gap-4">
+                    <div className="p-3 border-b border-border/50 flex items-center gap-3">
                         <div className="relative flex-1 max-w-md">
                             <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                             <Input
@@ -216,11 +216,11 @@ export function InvoiceWorkspace({ onNavigate }: InvoiceWorkspaceProps) {
                                 {filteredInvoices.map((inv) => (
                                     <div
                                         key={inv.id}
-                                        className="flex items-center justify-between px-6 py-4 hover:bg-muted/30 transition-colors cursor-pointer"
+                                        className="flex items-center justify-between px-4 py-3 hover:bg-muted/30 transition-colors cursor-pointer"
                                         onClick={() => handleEdit(inv)}
                                     >
                                         <div className="flex items-center gap-4">
-                                            <div className="w-12 h-12 rounded-xl bg-muted flex items-center justify-center">
+                                            <div className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center">
                                                 <span className="font-mono text-xs font-bold text-muted-foreground">
                                                     {inv.number.slice(-3)}
                                                 </span>

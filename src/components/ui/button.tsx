@@ -9,30 +9,30 @@ const buttonVariants = cva(
         variants: {
             variant: {
                 default:
-                    "bg-gradient-to-b from-primary to-emerald-600 text-white shadow-lg shadow-primary/25 hover:shadow-xl hover:shadow-primary/30 hover:-translate-y-0.5 active:translate-y-0 active:shadow-md",
+                    "bg-gradient-to-b from-indigo-500 to-indigo-600 text-white shadow-lg shadow-indigo-500/25 hover:shadow-xl hover:shadow-indigo-500/30 hover:-translate-y-0.5 active:translate-y-0 active:shadow-md",
                 destructive:
-                    "bg-gradient-to-b from-destructive to-red-600 text-white shadow-lg shadow-destructive/25 hover:shadow-xl hover:shadow-destructive/30 hover:-translate-y-0.5 active:translate-y-0",
+                    "bg-gradient-to-b from-rose-500 to-rose-600 text-white shadow-lg shadow-rose-500/25 hover:shadow-xl hover:shadow-rose-500/30 hover:-translate-y-0.5 active:translate-y-0",
                 outline:
-                    "border-2 border-border bg-card text-foreground hover:border-primary hover:bg-primary/5 active:bg-primary/10",
+                    "border-2 border-border bg-card text-foreground hover:border-indigo-400 hover:bg-indigo-50 active:bg-indigo-100",
                 secondary:
-                    "bg-gradient-to-b from-secondary to-indigo-600 text-white shadow-lg shadow-secondary/25 hover:shadow-xl hover:shadow-secondary/30 hover:-translate-y-0.5 active:translate-y-0",
+                    "bg-gradient-to-b from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/25 hover:shadow-xl hover:shadow-emerald-500/30 hover:-translate-y-0.5 active:translate-y-0",
                 ghost: 
                     "text-muted-foreground hover:text-foreground hover:bg-muted/80",
                 link: 
-                    "text-primary underline-offset-4 hover:underline font-medium",
+                    "text-indigo-600 underline-offset-4 hover:underline font-medium",
                 soft:
-                    "bg-primary/10 text-primary hover:bg-primary/20 active:bg-primary/25",
+                    "bg-indigo-50 text-indigo-600 hover:bg-indigo-100 active:bg-indigo-150",
                 "soft-secondary":
-                    "bg-secondary/10 text-secondary hover:bg-secondary/20 active:bg-secondary/25",
+                    "bg-emerald-50 text-emerald-600 hover:bg-emerald-100 active:bg-emerald-150",
             },
             size: {
-                default: "h-11 px-5 py-2.5",
-                sm: "h-9 px-4 text-xs rounded-lg",
-                lg: "h-12 px-6 text-base rounded-xl",
-                xl: "h-14 px-8 text-base rounded-2xl",
-                icon: "h-11 w-11",
-                "icon-sm": "h-9 w-9 rounded-lg",
-                "icon-lg": "h-12 w-12",
+                default: "h-9 px-4 py-2",
+                sm: "h-8 px-3 text-xs rounded-lg",
+                lg: "h-10 px-5 text-sm rounded-xl",
+                xl: "h-11 px-6 text-sm rounded-2xl",
+                icon: "h-9 w-9",
+                "icon-sm": "h-8 w-8 rounded-lg",
+                "icon-lg": "h-10 w-10",
             },
         },
         defaultVariants: {

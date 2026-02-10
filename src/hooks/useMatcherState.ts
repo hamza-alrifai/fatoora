@@ -48,7 +48,7 @@ interface MatcherState {
 
 const STORAGE_KEY = 'fatoora_matcher_state';
 
-export function useMatcherState(onStepChange: (step: 'configure' | 'done') => void) {
+export function useMatcherState(onStepChange: (step: 'upload' | 'configure' | 'done') => void) {
     const [masterConfig, setMasterConfig] = useState<FileConfig | null>(null);
     const [targetConfigs, setTargetConfigs] = useState<FileConfig[]>([]);
     const [outputFilePath, setOutputFilePath] = useState<string | null>(null);
@@ -85,6 +85,8 @@ export function useMatcherState(onStepChange: (step: 'configure' | 'done') => vo
 
                 if (data.stats && data.stats.totalMasterRows > 0) {
                     onStepChange('done');
+                } else if (data.masterConfig && data.targetConfigs?.length > 0) {
+                    onStepChange('configure');
                 }
             }
         } catch (e) {

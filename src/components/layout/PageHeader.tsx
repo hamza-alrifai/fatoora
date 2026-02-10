@@ -11,7 +11,7 @@ interface PageHeaderProps {
 
 export function PageHeader({ title, description, children, className, breadcrumb }: PageHeaderProps) {
     return (
-        <div className={cn("mb-6", className)}>
+        <div className={cn("mb-4", className)}>
             {breadcrumb && (
                 <div className="mb-2 text-sm text-muted-foreground">
                     {breadcrumb}
@@ -19,7 +19,7 @@ export function PageHeader({ title, description, children, className, breadcrumb
             )}
             <div className="flex items-start justify-between gap-4">
                 <div className="space-y-1 min-w-0">
-                    <h1 className="text-2xl font-semibold tracking-tight text-foreground">
+                    <h1 className="text-xl font-semibold tracking-tight text-foreground">
                         {title}
                     </h1>
                     {description && (

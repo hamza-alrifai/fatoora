@@ -65,93 +65,93 @@ export function Dashboard() {
 
     return (
         <div className="h-full bg-background overflow-y-auto">
-            <div className="max-w-[1600px] mx-auto px-8 py-8">
+            <div className="max-w-[1400px] mx-auto px-5 py-5">
                 {/* Header */}
-                <div className="mb-10">
+                <div className="mb-6">
                     <div className="flex items-center gap-3 mb-2">
-                        <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-primary to-emerald-600 flex items-center justify-center shadow-lg shadow-primary/20">
-                            <Sparkles className="w-5 h-5 text-white" />
+                        <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-indigo-500 to-indigo-600 flex items-center justify-center shadow-md shadow-indigo-500/20">
+                            <Sparkles className="w-4 h-4 text-white" />
                         </div>
                         <div>
-                            <h1 className="text-2xl font-bold tracking-tight">Welcome back</h1>
+                            <h1 className="text-xl font-bold tracking-tight">Welcome back</h1>
                             <p className="text-sm text-muted-foreground">Here's what's happening with your business</p>
                         </div>
                     </div>
                 </div>
 
                 {/* Stats Cards */}
-                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 mb-8">
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 mb-6">
                     {/* Revenue Card */}
-                    <div className="group relative overflow-hidden rounded-3xl bg-gradient-to-br from-emerald-500 to-teal-600 p-6 text-white shadow-xl shadow-emerald-500/20 hover:shadow-2xl hover:shadow-emerald-500/30 transition-all duration-300 hover:-translate-y-1">
+                    <div className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-500 to-emerald-600 p-4 text-white shadow-lg shadow-emerald-500/20 hover:shadow-2xl hover:shadow-emerald-500/30 transition-all duration-300 hover:-translate-y-1">
                         <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2" />
                         <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/5 rounded-full translate-y-1/2 -translate-x-1/2" />
                         <div className="relative">
                             <div className="flex items-center justify-between mb-4">
-                                <div className="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur flex items-center justify-center">
-                                    <TrendingUp className="w-6 h-6" />
+                                <div className="w-10 h-10 rounded-xl bg-white/20 backdrop-blur flex items-center justify-center">
+                                    <TrendingUp className="w-5 h-5" />
                                 </div>
-                                <div className="flex items-center gap-1 text-emerald-100 text-sm font-medium">
+                                <div className="flex items-center gap-1 text-emerald-200 text-sm font-medium">
                                     <ArrowUpRight className="w-4 h-4" />
                                     Revenue
                                 </div>
                             </div>
-                            <div className="text-4xl font-bold mb-1">
+                            <div className="text-2xl font-bold mb-0.5">
                                 {isLoading ? "..." : (stats.revenue || 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}
                             </div>
-                            <div className="text-emerald-100 text-sm font-medium">QAR Total Revenue</div>
+                            <div className="text-emerald-200 text-xs font-medium">QAR Total Revenue</div>
                         </div>
                     </div>
 
                     {/* Customers Card */}
-                    <div className="group relative overflow-hidden rounded-3xl bg-gradient-to-br from-violet-500 to-purple-600 p-6 text-white shadow-xl shadow-violet-500/20 hover:shadow-2xl hover:shadow-violet-500/30 transition-all duration-300 hover:-translate-y-1">
+                    <div className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-indigo-500 to-indigo-600 p-4 text-white shadow-lg shadow-indigo-500/20 hover:shadow-2xl hover:shadow-indigo-500/30 transition-all duration-300 hover:-translate-y-1">
                         <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2" />
                         <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/5 rounded-full translate-y-1/2 -translate-x-1/2" />
                         <div className="relative">
                             <div className="flex items-center justify-between mb-4">
-                                <div className="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur flex items-center justify-center">
-                                    <Users className="w-6 h-6" />
+                                <div className="w-10 h-10 rounded-xl bg-white/20 backdrop-blur flex items-center justify-center">
+                                    <Users className="w-5 h-5" />
                                 </div>
-                                <div className="flex items-center gap-1 text-violet-100 text-sm font-medium">
+                                <div className="flex items-center gap-1 text-indigo-200 text-sm font-medium">
                                     <ArrowUpRight className="w-4 h-4" />
                                     Customers
                                 </div>
                             </div>
-                            <div className="text-4xl font-bold mb-1">
+                            <div className="text-2xl font-bold mb-0.5">
                                 {isLoading ? "..." : stats.customers}
                             </div>
-                            <div className="text-violet-100 text-sm font-medium">Active Clients</div>
+                            <div className="text-indigo-200 text-xs font-medium">Active Clients</div>
                         </div>
                     </div>
 
                     {/* Outstanding Card */}
-                    <div className="group relative overflow-hidden rounded-3xl bg-gradient-to-br from-amber-500 to-orange-600 p-6 text-white shadow-xl shadow-amber-500/20 hover:shadow-2xl hover:shadow-amber-500/30 transition-all duration-300 hover:-translate-y-1">
+                    <div className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-amber-500 to-amber-600 p-4 text-white shadow-lg shadow-amber-500/20 hover:shadow-2xl hover:shadow-amber-500/30 transition-all duration-300 hover:-translate-y-1">
                         <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2" />
                         <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/5 rounded-full translate-y-1/2 -translate-x-1/2" />
                         <div className="relative">
                             <div className="flex items-center justify-between mb-4">
-                                <div className="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur flex items-center justify-center">
-                                    <Clock className="w-6 h-6" />
+                                <div className="w-10 h-10 rounded-xl bg-white/20 backdrop-blur flex items-center justify-center">
+                                    <Clock className="w-5 h-5" />
                                 </div>
                                 <div className="flex items-center gap-1 text-amber-100 text-sm font-medium">
                                     {stats.activeInvoices} pending
                                 </div>
                             </div>
-                            <div className="text-4xl font-bold mb-1">
+                            <div className="text-2xl font-bold mb-0.5">
                                 {isLoading ? "..." : (stats.outstanding || 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}
                             </div>
-                            <div className="text-amber-100 text-sm font-medium">QAR Outstanding</div>
+                            <div className="text-amber-100 text-xs font-medium">QAR Outstanding</div>
                         </div>
                     </div>
                 </div>
 
                 {/* Recent Invoices & Aging */}
-                <div className="grid gap-6 lg:grid-cols-5">
+                <div className="grid gap-4 lg:grid-cols-5">
                     {/* Recent Invoices */}
                     <Card className="lg:col-span-3">
                         <CardHeader className="pb-4">
                             <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-500/20">
-                                    <Receipt className="w-5 h-5 text-white" />
+                                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-indigo-600 flex items-center justify-center shadow-md shadow-indigo-500/20">
+                                    <Receipt className="w-4 h-4 text-white" />
                                 </div>
                                 <div>
                                     <CardTitle>Recent Invoices</CardTitle>
@@ -166,8 +166,8 @@ export function Dashboard() {
                                 </div>
                             ) : recentInvoices.length === 0 ? (
                                 <div className="flex flex-col items-center justify-center h-48 text-center space-y-3">
-                                    <div className="w-14 h-14 rounded-2xl bg-muted flex items-center justify-center">
-                                        <Receipt className="w-7 h-7 text-muted-foreground" />
+                                    <div className="w-10 h-10 rounded-xl bg-muted flex items-center justify-center">
+                                        <Receipt className="w-5 h-5 text-muted-foreground" />
                                     </div>
                                     <div>
                                         <div className="font-semibold text-foreground">No invoices yet</div>
@@ -179,11 +179,11 @@ export function Dashboard() {
                                     {recentInvoices.map((inv, index) => (
                                         <div 
                                             key={inv.id} 
-                                            className="flex items-center justify-between px-6 py-4 hover:bg-muted/30 transition-colors"
+                                            className="flex items-center justify-between px-4 py-3 hover:bg-muted/30 transition-colors"
                                             style={{ animationDelay: `${index * 50}ms` }}
                                         >
                                             <div className="flex items-center gap-4">
-                                                <div className="w-10 h-10 rounded-xl bg-muted flex items-center justify-center font-mono text-xs font-bold text-muted-foreground">
+                                                <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center font-mono text-xs font-bold text-muted-foreground">
                                                     {inv.number === 'DRAFT' ? '...' : inv.number.slice(-3)}
                                                 </div>
                                                 <div>
@@ -220,8 +220,8 @@ export function Dashboard() {
                     <Card className="lg:col-span-2">
                         <CardHeader className="pb-4">
                             <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-rose-500 to-pink-600 flex items-center justify-center shadow-lg shadow-rose-500/20">
-                                    <CalendarClock className="w-5 h-5 text-white" />
+                                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-rose-500 to-rose-600 flex items-center justify-center shadow-md shadow-rose-500/20">
+                                    <CalendarClock className="w-4 h-4 text-white" />
                                 </div>
                                 <div>
                                     <CardTitle>Invoice Aging</CardTitle>
@@ -236,11 +236,11 @@ export function Dashboard() {
                                 </div>
                             ) : stats.activeInvoices === 0 ? (
                                 <div className="flex flex-col items-center justify-center h-48 text-center space-y-3">
-                                    <div className="w-14 h-14 rounded-2xl bg-emerald-50 flex items-center justify-center">
-                                        <CheckCircle2 className="w-7 h-7 text-emerald-500" />
+                                    <div className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center">
+                                        <CheckCircle2 className="w-5 h-5 text-indigo-500" />
                                     </div>
                                     <div>
-                                        <div className="font-semibold text-emerald-600">All caught up!</div>
+                                        <div className="font-semibold text-indigo-600">All caught up!</div>
                                         <div className="text-sm text-muted-foreground mt-1">No outstanding invoices</div>
                                     </div>
                                 </div>
@@ -262,10 +262,10 @@ export function Dashboard() {
                                     });
 
                                 const bucketConfig = [
-                                    { key: '0-30', label: '0-30 Days', color: 'from-blue-500 to-cyan-500', bg: 'bg-blue-50', text: 'text-blue-600' },
-                                    { key: '31-60', label: '31-60 Days', color: 'from-amber-500 to-yellow-500', bg: 'bg-amber-50', text: 'text-amber-600' },
-                                    { key: '61-90', label: '61-90 Days', color: 'from-orange-500 to-red-500', bg: 'bg-orange-50', text: 'text-orange-600' },
-                                    { key: '90+', label: '90+ Days', color: 'from-red-500 to-rose-600', bg: 'bg-red-50', text: 'text-red-600' },
+                                    { key: '0-30', label: '0-30 Days', color: 'from-indigo-500 to-indigo-600', bg: 'bg-indigo-50', text: 'text-indigo-600' },
+                                    { key: '31-60', label: '31-60 Days', color: 'from-amber-500 to-amber-600', bg: 'bg-amber-50', text: 'text-amber-600' },
+                                    { key: '61-90', label: '61-90 Days', color: 'from-orange-500 to-orange-600', bg: 'bg-orange-50', text: 'text-orange-600' },
+                                    { key: '90+', label: '90+ Days', color: 'from-rose-500 to-rose-600', bg: 'bg-rose-50', text: 'text-rose-600' },
                                 ];
 
                                 return (
@@ -281,7 +281,7 @@ export function Dashboard() {
                                                         <span className={`text-sm font-semibold ${text}`}>{label}</span>
                                                         <span className={`text-xs font-medium ${text}`}>{bucketInvoices.length} invoice{bucketInvoices.length > 1 ? 's' : ''}</span>
                                                     </div>
-                                                    <div className={`text-2xl font-bold ${text}`}>
+                                                    <div className={`text-lg font-bold ${text}`}>
                                                         {total.toLocaleString()} <span className="text-sm font-medium">QAR</span>
                                                     </div>
                                                 </div>

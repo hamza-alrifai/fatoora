@@ -33,11 +33,11 @@ export function AppShell({ children, activeTab, onTabChange }: AppShellProps) {
     const [isCollapsed, setIsCollapsed] = React.useState(false);
 
     const navItems: NavItem[] = [
-        { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, color: 'from-violet-500 to-purple-600' },
-        { id: 'matcher', label: 'Reconciliation', icon: FileSpreadsheet, color: 'from-emerald-500 to-teal-600' },
-        { id: 'invoicing', label: 'Invoices', icon: Receipt, color: 'from-blue-500 to-indigo-600' },
-        { id: 'customers', label: 'Customers', icon: Users, color: 'from-orange-500 to-amber-600' },
-        { id: 'settings', label: 'Settings', icon: Settings, color: 'from-slate-500 to-slate-600' },
+        { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, color: 'from-indigo-500 to-indigo-600' },
+        { id: 'matcher', label: 'Reconciliation', icon: FileSpreadsheet, color: 'from-indigo-500 to-indigo-600' },
+        { id: 'invoicing', label: 'Invoices', icon: Receipt, color: 'from-indigo-500 to-indigo-600' },
+        { id: 'customers', label: 'Customers', icon: Users, color: 'from-indigo-500 to-indigo-600' },
+        { id: 'settings', label: 'Settings', icon: Settings, color: 'from-indigo-500 to-indigo-600' },
     ];
 
     return (
@@ -47,7 +47,7 @@ export function AppShell({ children, activeTab, onTabChange }: AppShellProps) {
                 <aside
                     className={cn(
                         "relative flex-shrink-0 flex flex-col bg-card border-r border-border/50 z-20 transition-all duration-300 ease-out",
-                        isCollapsed ? "w-20" : "w-64"
+                        isCollapsed ? "w-16" : "w-56"
                     )}
                 >
                     {/* Drag Region */}
@@ -55,15 +55,15 @@ export function AppShell({ children, activeTab, onTabChange }: AppShellProps) {
 
                     {/* Logo */}
                     <div className={cn(
-                        "flex items-center gap-3 px-5 pb-8",
+                        "flex items-center gap-3 px-4 pb-5",
                         isCollapsed && "justify-center px-0"
                     )}>
-                        <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg shadow-emerald-500/25">
-                            <span className="text-white font-bold text-xl">F</span>
+                        <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 to-indigo-600 flex items-center justify-center shadow-md shadow-indigo-500/25">
+                            <span className="text-white font-bold text-base">F</span>
                         </div>
                         {!isCollapsed && (
                             <div className="animate-fade">
-                                <h1 className="text-xl font-bold tracking-tight">Fatoora</h1>
+                                <h1 className="text-base font-bold tracking-tight">Fatoora</h1>
                                 <p className="text-[11px] text-muted-foreground font-medium">Invoice Platform</p>
                             </div>
                         )}
@@ -88,7 +88,7 @@ export function AppShell({ children, activeTab, onTabChange }: AppShellProps) {
                                     onClick={() => onTabChange(item.id)}
                                     style={{ animationDelay: `${index * 50}ms` }}
                                     className={cn(
-                                        "w-full flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-semibold transition-all duration-200 group animate-slide-in",
+                                        "w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm font-semibold transition-all duration-200 group animate-slide-in",
                                         isActive
                                             ? "bg-gradient-to-r from-primary/10 to-primary/5 text-primary shadow-sm"
                                             : "text-muted-foreground hover:text-foreground hover:bg-muted/50",
@@ -96,7 +96,7 @@ export function AppShell({ children, activeTab, onTabChange }: AppShellProps) {
                                     )}
                                 >
                                     <div className={cn(
-                                        "flex items-center justify-center w-9 h-9 rounded-xl transition-all duration-200",
+                                        "flex items-center justify-center w-8 h-8 rounded-lg transition-all duration-200",
                                         isActive 
                                             ? `bg-gradient-to-br ${item.color} shadow-lg` 
                                             : "bg-muted/80 group-hover:bg-muted"

@@ -164,7 +164,7 @@ export function InvoiceEditor({ invoice: initialInvoice, onSave, onDelete, onGen
                     {invoice.status === 'draft' && (
                         <Button
                             onClick={() => setShowIssueDialog(true)}
-                            className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white h-8 shadow-lg shadow-emerald-500/25 font-semibold px-4"
+                            className="bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-400 hover:to-emerald-500 text-white h-8 shadow-lg shadow-emerald-500/25 font-semibold px-4"
                             size="sm"
                         >
                             <Receipt className="w-3.5 h-3.5 mr-1.5" /> Issue Invoice

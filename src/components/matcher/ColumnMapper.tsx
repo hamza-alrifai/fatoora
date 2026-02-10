@@ -77,27 +77,27 @@ export function ColumnMapper({
             title={`Map Columns`}
             description={
                 <span>
-                    Please confirm the columns for <span className="font-extrabold text-xl text-foreground break-all">{fileName ? fileName : 'the selected file'}</span>.
+                    Please confirm the columns for <span className="font-bold text-sm text-foreground break-all">{fileName ? fileName : 'the selected file'}</span>.
                 </span>
             }
-            className="max-w-5xl"
+            className="max-w-3xl"
         >
-            <div className="space-y-8 py-4">
+            <div className="space-y-5 py-2">
 
                 {/* Configuration Area */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 p-6 rounded-2xl bg-white/5 border border-white/10">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5 p-4 rounded-xl bg-white/5 border border-white/10">
 
                     {/* ID Column Selection */}
                     <div className="space-y-3">
-                        <label className="text-lg font-bold text-foreground flex items-center gap-3">
-                            <span className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/20 text-primary text-base font-bold">1</span>
+                        <label className="text-sm font-bold text-foreground flex items-center gap-2">
+                            <span className="flex items-center justify-center w-6 h-6 rounded-full bg-primary/20 text-primary text-xs font-bold">1</span>
                             {fileType === 'master' ? 'Ticket Number Column' : 'Description / Material Column'} <span className="text-destructive">*</span>
                         </label>
                         <select
                             value={idCol}
                             onChange={(e) => setIdCol(Number(e.target.value))}
                             className={cn(
-                                "w-full bg-background/50 border rounded-xl h-12 px-4 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary/50 shadow-sm",
+                                "w-full bg-background/50 border rounded-lg h-9 px-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary/50 shadow-sm",
                                 idCol === -1 ? "border-destructive text-destructive" : "border-white/10"
                             )}
                         >
@@ -108,15 +108,15 @@ export function ColumnMapper({
                     {/* Result Column Selection (Only for Master) */}
                     {fileType === 'master' && (
                         <div className="space-y-3">
-                            <label className="text-lg font-bold text-foreground flex items-center gap-3">
-                                <span className="flex items-center justify-center w-8 h-8 rounded-full bg-emerald-500/20 text-emerald-600 text-base font-bold">2</span>
+                            <label className="text-sm font-bold text-foreground flex items-center gap-2">
+                                <span className="flex items-center justify-center w-6 h-6 rounded-full bg-emerald-500/20 text-emerald-600 text-xs font-bold">2</span>
                                 Customer Name Column <span className="text-destructive">*</span>
                             </label>
                             <select
                                 value={resultCol}
                                 onChange={(e) => setResultCol(Number(e.target.value))}
                                 className={cn(
-                                    "w-full bg-background/50 border rounded-xl h-12 px-4 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500/50 shadow-sm",
+                                    "w-full bg-background/50 border rounded-lg h-9 px-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500/50 shadow-sm",
                                     resultCol === -1 ? "border-destructive text-destructive" : "border-white/10"
                                 )}
                             >
@@ -128,15 +128,15 @@ export function ColumnMapper({
                     {/* Customer Selection (Only for Target) */}
                     {fileType === 'target' && (
                         <div className="space-y-3">
-                            <label className="text-lg font-bold text-foreground flex items-center gap-3">
-                                <span className="flex items-center justify-center w-8 h-8 rounded-full bg-blue-500/20 text-blue-600 text-base font-bold">2</span>
+                            <label className="text-sm font-bold text-foreground flex items-center gap-2">
+                                <span className="flex items-center justify-center w-6 h-6 rounded-full bg-blue-500/20 text-blue-600 text-xs font-bold">2</span>
                                 Matches Customer Label <span className="text-destructive">*</span>
                             </label>
                             <select
                                 value={matchLabel}
                                 onChange={(e) => setMatchLabel(e.target.value)}
                                 className={cn(
-                                    "w-full bg-background/50 border rounded-xl h-12 px-4 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/50 shadow-sm",
+                                    "w-full bg-background/50 border rounded-lg h-9 px-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/50 shadow-sm",
                                     !matchLabel ? "border-destructive text-destructive font-medium" : "border-white/10"
                                 )}
                             >
@@ -160,13 +160,13 @@ export function ColumnMapper({
                         </Badge>
                     </div>
                     <div className="rounded-lg border bg-card shadow-sm overflow-hidden relative">
-                        <div className="h-[300px] overflow-auto relative">
+                        <div className="h-[220px] overflow-auto relative">
                             <table className="w-full caption-bottom text-sm">
                                 <TableHeader className="bg-card sticky top-0 z-10 shadow-sm">
                                     <TableRow className="hover:bg-transparent border-b border-border text-foreground">
                                         {headers.slice(0, 20).map(h => (
                                             <TableHead key={h.index} className={cn(
-                                                "whitespace-nowrap h-10 text-sm font-bold px-4 py-2",
+                                                "whitespace-nowrap h-8 text-xs font-bold px-3 py-1.5",
                                                 h.index === idCol ? "!text-yellow-900 !bg-yellow-200 !border-b-4 !border-yellow-600 !font-bold" : "",
                                                 h.index === resultCol ? "!text-yellow-900 !bg-yellow-200 !border-b-4 !border-yellow-600 !font-bold" : ""
                                             )}>
@@ -184,7 +184,7 @@ export function ColumnMapper({
                                         <TableRow key={rIdx} className="hover:bg-muted/50 border-b border-border last:border-0 transition-colors">
                                             {headers.slice(0, 20).map(h => (
                                                 <TableCell key={h.index} className={cn(
-                                                    "py-3 px-4 font-mono text-sm whitespace-nowrap text-foreground/80",
+                                                    "py-2 px-3 font-mono text-xs whitespace-nowrap text-foreground/80",
                                                     h.index === idCol ? "!text-yellow-900 !font-bold !bg-yellow-100" : "",
                                                     h.index === resultCol ? "!text-yellow-900 !font-bold !bg-yellow-100" : ""
                                                 )}>
@@ -201,20 +201,19 @@ export function ColumnMapper({
                 </div>
 
                 {/* Footer Actions */}
-                <div className="flex justify-end gap-3 pt-4 border-t border-white/10">
-                    <Button variant="ghost" size="lg" onClick={() => onOpenChange(false)} className="text-base">
+                <div className="flex justify-end gap-3 pt-3 border-t border-white/10">
+                    <Button variant="ghost" onClick={() => onOpenChange(false)}>
                         Cancel
                     </Button>
                     <Button
                         onClick={handleConfirm}
                         disabled={!isReady}
-                        size="lg"
                         className={cn(
-                            "gap-2 font-bold transition-all text-base px-8",
+                            "gap-2 font-bold transition-all px-6",
                             isReady ? "bg-primary hover:bg-primary/90 shadow-lg shadow-primary/20" : "opacity-50 cursor-not-allowed"
                         )}
                     >
-                        Confirm <ArrowRight className="w-5 h-5" />
+                        Confirm <ArrowRight className="w-4 h-4" />
                     </Button>
                 </div>
             </div>

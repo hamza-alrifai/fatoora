@@ -45,7 +45,7 @@ export function GlassDialog({
 
     return (
         <div 
-            className="fixed inset-0 z-50 flex items-center justify-center p-6"
+            className="fixed inset-0 z-50 flex items-center justify-center p-4"
             role="dialog"
             aria-modal="true"
             aria-labelledby="dialog-title"
@@ -62,16 +62,16 @@ export function GlassDialog({
                 ref={dialogRef}
                 tabIndex={-1}
                 className={cn(
-                    "relative w-full overflow-hidden rounded-3xl bg-card shadow-2xl animate-scale-in",
+                    "relative w-full overflow-hidden rounded-2xl bg-card shadow-2xl animate-scale-in max-h-[90vh] flex flex-col",
                     sizeClasses[size],
                     className
                 )}
                 onClick={(e) => e.stopPropagation()}
             >
                 {/* Header */}
-                <div className="flex items-start justify-between gap-4 px-8 pt-8 pb-4">
+                <div className="flex items-start justify-between gap-3 px-5 pt-5 pb-3">
                     <div className="space-y-1">
-                        <h2 id="dialog-title" className="text-xl font-bold text-foreground tracking-tight">
+                        <h2 id="dialog-title" className="text-lg font-bold text-foreground tracking-tight">
                             {title}
                         </h2>
                         {description && (
@@ -82,15 +82,15 @@ export function GlassDialog({
                     </div>
                     <button
                         onClick={onClose}
-                        className="w-10 h-10 rounded-xl bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground transition-all flex items-center justify-center flex-shrink-0"
+                        className="w-8 h-8 rounded-lg bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground transition-all flex items-center justify-center flex-shrink-0"
                         aria-label="Close dialog"
                     >
-                        <X className="w-5 h-5" />
+                        <X className="w-4 h-4" />
                     </button>
                 </div>
 
                 {/* Body */}
-                <div className="px-8 pb-8">
+                <div className="px-5 pb-5 overflow-y-auto">
                     {children}
                 </div>
             </div>

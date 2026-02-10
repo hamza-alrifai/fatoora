@@ -40,32 +40,32 @@ export default function MatcherResultsView({
     const totalRows = perFileStats?.reduce((sum, file) => sum + file.total, 0) || 0;
     
     return (
-        <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-emerald-600 to-teal-700 text-white shadow-2xl">
-                <div className="absolute top-0 right-0 p-12 opacity-10">
-                    <Check className="w-64 h-64" />
+        <div className="max-w-3xl mx-auto space-y-5 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-indigo-600 to-indigo-700 text-white shadow-xl">
+                <div className="absolute top-0 right-0 p-8 opacity-10">
+                    <Check className="w-40 h-40" />
                 </div>
-                <div className="relative z-10 p-8 md:p-10">
-                    <div className="flex flex-col md:flex-row justify-between gap-8 items-start md:items-center">
+                <div className="relative z-10 p-5 md:p-6">
+                    <div className="flex flex-col md:flex-row justify-between gap-4 items-start md:items-center">
                         <div className="flex-1">
                             <div className="flex items-center gap-3 mb-2">
-                                <div className="p-2 bg-white/20 rounded-full backdrop-blur-sm">
-                                    <Check className="w-6 h-6 text-white" />
+                                <div className="p-1.5 bg-white/20 rounded-full backdrop-blur-sm">
+                                    <Check className="w-4 h-4 text-white" />
                                 </div>
-                                <h1 className="text-3xl font-bold text-white">
+                                <h1 className="text-xl font-bold text-white">
                                     Reconciliation Complete
                                 </h1>
                             </div>
-                            <p className="text-emerald-100 text-sm">
+                            <p className="text-indigo-200 text-sm">
                                 Successfully processed {totalRows.toLocaleString()} rows • {stats?.unmatchedMasterRows || 0} unmatched items
                             </p>
                         </div>
 
                         {stats && executiveSummary && (
-                            <div className="flex gap-6 bg-white/10 p-6 rounded-2xl backdrop-blur-sm border border-white/10">
+                            <div className="flex gap-4 bg-white/10 p-4 rounded-xl backdrop-blur-sm border border-white/10">
                                 <div className="space-y-1">
-                                    <p className="text-xs text-emerald-200 uppercase font-bold tracking-wider">Match Rate</p>
-                                    <p className="text-3xl font-bold font-mono">
+                                    <p className="text-xs text-indigo-200 uppercase font-bold tracking-wider">Match Rate</p>
+                                    <p className="text-2xl font-bold font-mono">
                                         {stats.matchPercentage}%
                                     </p>
                                 </div>
@@ -75,56 +75,54 @@ export default function MatcherResultsView({
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <Card className="col-span-1 md:col-span-2 border-primary/20 bg-gradient-to-br from-primary/5 to-transparent hover:border-primary/50 transition-all cursor-pointer group relative overflow-hidden">
                     <div className="absolute inset-0 bg-primary/5 translate-y-full group-hover:translate-y-0 transition-transform duration-300" />
-                    <CardContent className="p-8 relative z-10 flex flex-col items-center text-center h-full">
-                        <div className="p-4 bg-primary/10 text-primary rounded-2xl mb-6 group-hover:scale-110 transition-transform shadow-sm">
-                            <Files className="w-10 h-10" />
+                    <CardContent className="p-5 relative z-10 flex flex-col items-center text-center h-full">
+                        <div className="p-3 bg-primary/10 text-primary rounded-xl mb-4 group-hover:scale-110 transition-transform shadow-sm">
+                            <Files className="w-7 h-7" />
                         </div>
-                        <h3 className="text-3xl font-bold mb-3">What's Next?</h3>
-                        <div className="space-y-4 mb-8 max-w-lg">
+                        <h3 className="text-xl font-bold mb-2">What's Next?</h3>
+                        <div className="space-y-3 mb-5 max-w-lg">
                             <div className="flex items-center gap-3 text-muted-foreground">
-                                <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                                    <span className="text-primary font-bold text-sm">1</span>
+                                <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center">
+                                    <span className="text-primary font-bold text-xs">1</span>
                                 </div>
-                                <span className="text-lg">Generate <strong>Invoices</strong> for matched items</span>
+                                <span className="text-sm">Generate <strong>Invoices</strong> for matched items</span>
                             </div>
                             {stats?.unmatchedMasterRows && stats.unmatchedMasterRows > 0 && (
-                                <div className="flex items-center gap-3 text-orange-600">
-                                    <div className="w-8 h-8 rounded-full bg-orange-100 flex items-center justify-center">
-                                        <span className="text-orange-600 font-bold text-sm">!</span>
+                                <div className="flex items-center gap-3 text-amber-600">
+                                    <div className="w-6 h-6 rounded-full bg-amber-100 flex items-center justify-center">
+                                        <span className="text-amber-600 font-bold text-xs">!</span>
                                     </div>
-                                    <span className="text-lg">Review <strong>{stats.unmatchedMasterRows} unmatched</strong> items</span>
+                                    <span className="text-sm">Review <strong>{stats.unmatchedMasterRows} unmatched</strong> items</span>
                                 </div>
                             )}
                         </div>
                         <div className="flex gap-4 items-center justify-center flex-wrap">
                             <Button
-                                size="lg"
-                                className="max-w-sm text-lg font-bold shadow-lg shadow-primary/20 h-12 px-8"
+                                className="max-w-sm font-bold shadow-lg shadow-primary/20 px-6"
                                 onClick={handlePrepareGeneration}
                                 disabled={isGeneratingInvoices}
                             >
                                 {isGeneratingInvoices ? (
                                     <>
-                                        <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                                         Generating...
                                     </>
                                 ) : (
                                     <>
-                                        Generate Invoices <ArrowRight className="ml-2 w-5 h-5" />
+                                        Generate Invoices <ArrowRight className="ml-2 w-4 h-4" />
                                     </>
                                 )}
                             </Button>
                             {stats?.unmatchedMasterRows && stats.unmatchedMasterRows > 0 && (
                                 <Button
-                                    size="lg"
-                                    className="max-w-sm bg-orange-500 hover:bg-orange-600 text-white text-lg font-bold shadow-lg shadow-orange-500/20 h-12 px-8 transition-all duration-200"
+                                    className="max-w-sm bg-amber-500 hover:bg-amber-600 text-white font-bold shadow-lg shadow-amber-500/20 px-6 transition-all duration-200"
                                     onClick={handleOpenUnmatched}
                                     disabled={isGeneratingInvoices}
                                 >
-                                    <Download className="w-5 h-5 mr-2" />
+                                    <Download className="w-4 h-4 mr-2" />
                                     Review Unmatched
                                 </Button>
                             )}
@@ -133,7 +131,7 @@ export default function MatcherResultsView({
                 </Card>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {perFileStats && perFileStats.length > 0 && (
                     <Card className="md:col-span-3 bg-card/50">
                         <CardHeader className="pb-3">

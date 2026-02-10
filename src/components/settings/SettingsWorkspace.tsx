@@ -123,14 +123,14 @@ export function SettingsWorkspace() {
 
     return (
         <div className="h-full bg-background overflow-y-auto">
-            <div className="max-w-3xl mx-auto px-8 py-8">
+            <div className="max-w-3xl mx-auto px-5 py-5">
                 {/* Header */}
-                <div className="flex items-center gap-4 mb-10">
-                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-slate-500 to-slate-700 flex items-center justify-center shadow-lg shadow-slate-500/20">
-                        <Settings className="w-6 h-6 text-white" />
+                <div className="flex items-center gap-3 mb-6">
+                    <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 to-indigo-600 flex items-center justify-center shadow-md shadow-indigo-500/20">
+                        <Settings className="w-4 h-4 text-white" />
                     </div>
                     <div>
-                        <h1 className="text-2xl font-bold tracking-tight">Settings</h1>
+                        <h1 className="text-xl font-bold tracking-tight">Settings</h1>
                         <p className="text-sm text-muted-foreground">Manage your application preferences</p>
                     </div>
                 </div>
@@ -140,8 +140,8 @@ export function SettingsWorkspace() {
                     <Card>
                         <CardHeader>
                             <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center">
-                                    <Building2 className="w-5 h-5 text-white" />
+                                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-indigo-600 flex items-center justify-center">
+                                    <Building2 className="w-4 h-4 text-white" />
                                 </div>
                                 <div>
                                     <CardTitle>Banking Details</CardTitle>
@@ -216,8 +216,8 @@ export function SettingsWorkspace() {
                     <Card>
                         <CardHeader>
                             <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
-                                    <Database className="w-5 h-5 text-white" />
+                                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-indigo-600 flex items-center justify-center">
+                                    <Database className="w-4 h-4 text-white" />
                                 </div>
                                 <div>
                                     <CardTitle>Data Management</CardTitle>
@@ -243,23 +243,23 @@ export function SettingsWorkspace() {
                     </Card>
 
                     {/* Danger Zone */}
-                    <Card className="border-red-200 bg-red-50/50">
+                    <Card className="border-rose-200 bg-rose-50/50">
                         <CardHeader>
                             <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-red-500 to-rose-600 flex items-center justify-center">
-                                    <AlertTriangle className="w-5 h-5 text-white" />
+                                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-rose-500 to-rose-600 flex items-center justify-center">
+                                    <AlertTriangle className="w-4 h-4 text-white" />
                                 </div>
                                 <div>
-                                    <CardTitle className="text-red-700">Danger Zone</CardTitle>
-                                    <p className="text-sm text-red-600/70">Irreversible actions</p>
+                                    <CardTitle className="text-rose-700">Danger Zone</CardTitle>
+                                    <p className="text-sm text-rose-600/70">Irreversible actions</p>
                                 </div>
                             </div>
                         </CardHeader>
                         <CardContent>
-                            <div className="flex items-center justify-between p-4 rounded-xl bg-white/80 border border-red-200">
+                            <div className="flex items-center justify-between p-4 rounded-xl bg-white/80 border border-rose-200">
                                 <div>
-                                    <h4 className="font-semibold text-red-700">Clear All Data</h4>
-                                    <p className="text-sm text-red-600/70">Permanently remove all customers, invoices, and settings</p>
+                                    <h4 className="font-semibold text-rose-700">Clear All Data</h4>
+                                    <p className="text-sm text-rose-600/70">Permanently remove all customers, invoices, and settings</p>
                                 </div>
                                 <Button variant="destructive" onClick={() => openConfirmDialog('clear')}>
                                     Clear Data
@@ -272,10 +272,10 @@ export function SettingsWorkspace() {
 
             {/* Confirmation Dialog */}
             {confirmDialogOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-foreground/40 backdrop-blur-md">
-                    <div className="w-full max-w-md rounded-3xl bg-card p-8 shadow-2xl animate-scale-in">
-                        <h3 className="text-xl font-bold text-destructive mb-2">Are you absolutely sure?</h3>
-                        <p className="text-sm text-muted-foreground mb-6">
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-foreground/40 backdrop-blur-md">
+                    <div className="w-full max-w-sm rounded-xl bg-card p-5 shadow-2xl animate-scale-in">
+                        <h3 className="text-base font-bold text-destructive mb-2">Are you absolutely sure?</h3>
+                        <p className="text-sm text-muted-foreground mb-4">
                             This action cannot be undone. This will permanently delete your data.
                         </p>
                         <div className="space-y-4">

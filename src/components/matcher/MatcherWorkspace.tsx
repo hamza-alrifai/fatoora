@@ -7,9 +7,9 @@ import { Loader2, RefreshCw, FileSpreadsheet } from 'lucide-react';
 
 import { useMatcherState, type FileGenConfig } from '@/hooks/useMatcherState';
 import { parseQuantitySafe } from '@/utils/quantity-parser';
-import { ColumnMapper } from './ColumnMapper';
 import type { CustomerData } from '@/components/customers/CustomerCreationDialog';
 
+const MatcherUploadView = lazy(() => import('./MatcherUploadView'));
 const MatcherConfigureView = lazy(() => import('./MatcherConfigureView'));
 const MatcherResultsView = lazy(() => import('./MatcherResultsView'));
 const InvoiceGenerationDialog = lazy(() => import('./InvoiceGenerationDialog'));
@@ -22,8 +22,8 @@ interface FileConfig extends FileAnalysis {
 }
 
 interface MatcherWorkspaceProps {
-    currentStep: 'configure' | 'done';
-    onStepChange: (step: 'configure' | 'done') => void;
+    currentStep: 'upload' | 'configure' | 'done';
+    onStepChange: (step: 'upload' | 'configure' | 'done') => void;
 }
 
 export function MatcherWorkspace({ currentStep, onStepChange }: MatcherWorkspaceProps) {
@@ -59,8 +59,6 @@ export function MatcherWorkspace({ currentStep, onStepChange }: MatcherWorkspace
     } = matcherState;
 
     // UX State (not persisted)
-    const [mapperOpen, setMapperOpen] = useState(false);
-    const [mappingTarget, setMappingTarget] = useState<{ type: 'master' | 'target', index: number } | null>(null);
     const [isProcessing, setIsProcessing] = useState(false);
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [unmatchedPath, setUnmatchedPath] = useState<string | null>(null);
@@ -235,48 +233,6 @@ export function MatcherWorkspace({ currentStep, onStepChange }: MatcherWorkspace
     };
 
 
-    const handleConfirmMapping = (idCol: number, resultCol?: number, matchLabel?: string) => {
-        if (!mappingTarget) return;
-
-        if (mappingTarget.type === 'master') {
-            setMasterConfig(prev => prev ? ({
-                ...prev,
-                overrideIdColumn: idCol,
-                overrideResultColumn: resultCol
-            }) : null);
-        } else {
-            // Handle new customer creation from dialog if needed
-            if (matchLabel === '___NEW___') {
-                setCreatingCustomerForTargetIndex(mappingTarget.index);
-                setIsCreatingCustomer(true);
-                setIsCustomerDialogOpen(true);
-                setMapperOpen(false);
-                setMappingTarget(null);
-                return;
-            }
-
-            setTargetConfigs(prev => prev.map((c, i) =>
-                i === mappingTarget.index ? ({
-                    ...c,
-                    overrideIdColumn: idCol,
-                    matchLabel: matchLabel !== undefined ? matchLabel : c.matchLabel
-                }) : c
-            ));
-
-            // Chain to next file if available
-            const nextIndex = mappingTarget.index + 1;
-            if (nextIndex < targetConfigs.length) {
-                // Determine if we should pause slightly or just switch
-                // React state batching handles the switch cleanly
-                setMappingTarget({ type: 'target', index: nextIndex });
-                // Dialog remains open
-                return;
-            }
-        }
-
-        setMapperOpen(false);
-        setMappingTarget(null);
-    };
 
     const handleSelectMaster = async () => {
         const res = await window.electron.openFileDialog({
@@ -290,10 +246,7 @@ export function MatcherWorkspace({ currentStep, onStepChange }: MatcherWorkspace
             setIsAnalyzing(false);
 
             // Trigger Mapper
-            if (config) {
-                setMappingTarget({ type: 'master', index: 0 });
-                setMapperOpen(true);
-            }
+            // File analyzed, no auto-popup — user configures columns in Step 2
         }
     };
 
@@ -310,15 +263,10 @@ export function MatcherWorkspace({ currentStep, onStepChange }: MatcherWorkspace
                 if (config) configs.push(config);
             }
 
-            const startIndex = targetConfigs.length;
             setTargetConfigs(prev => [...prev, ...configs]);
             setIsAnalyzing(false);
 
-            // Trigger Mapper for the FIRST new file
-            if (configs.length > 0) {
-                setMappingTarget({ type: 'target', index: startIndex });
-                setMapperOpen(true);
-            }
+            // Files analyzed, no auto-popup — user configures columns in Step 2
         }
     };
 
@@ -330,6 +278,10 @@ export function MatcherWorkspace({ currentStep, onStepChange }: MatcherWorkspace
         setTargetConfigs(prev => prev.map((c, i) =>
             i === index ? { ...c, matchLabel: label } : c
         ));
+    };
+
+    const handleContinueToConfig = () => {
+        onStepChange('configure');
     };
 
     const isReady =
@@ -648,7 +600,7 @@ export function MatcherWorkspace({ currentStep, onStepChange }: MatcherWorkspace
         reset();
         setUnmatchedPath(null);
         setMatchedRows([]);
-        onStepChange('configure');
+        onStepChange('upload');
     }, [reset, onStepChange]);
 
 
@@ -670,32 +622,34 @@ export function MatcherWorkspace({ currentStep, onStepChange }: MatcherWorkspace
         <div className="flex flex-col h-full bg-background overflow-hidden">
             <main className="flex-1 flex flex-col overflow-hidden">
                 {/* Premium Header */}
-                <header className="px-8 py-6 border-b border-border/50 bg-card/50">
+                <header className="px-5 py-4 border-b border-border/50 bg-card/50">
                     <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-4">
-                            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg shadow-emerald-500/20">
-                                <FileSpreadsheet className="w-6 h-6 text-white" />
+                        <div className="flex items-center gap-3">
+                            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 to-indigo-600 flex items-center justify-center shadow-md shadow-indigo-500/20">
+                                <FileSpreadsheet className="w-4 h-4 text-white" />
                             </div>
                             <div>
-                                <h1 className="text-xl font-bold tracking-tight">
-                                    {currentStep === 'configure' ? 'Reconciliation' : 'Reconciliation Complete'}
+                                <h1 className="text-lg font-bold tracking-tight">
+                                    {currentStep === 'done' ? 'Reconciliation Complete' : 'Reconciliation'}
                                 </h1>
-                                <p className="text-sm text-muted-foreground">
-                                    {currentStep === 'configure' 
-                                        ? 'Match and reconcile your Excel files' 
-                                        : 'Review results and generate invoices'}
+                                <p className="text-xs text-muted-foreground">
+                                    {currentStep === 'upload' && 'Upload your Excel files to get started'}
+                                    {currentStep === 'configure' && 'Configure column mappings'}
+                                    {currentStep === 'done' && 'Review results and generate invoices'}
                                 </p>
                             </div>
                         </div>
-                        <Button 
-                            variant="outline" 
-                            size="sm" 
-                            onClick={handleReset}
-                            className="gap-2"
-                        >
-                            <RefreshCw className="w-4 h-4" />
-                            Start Over
-                        </Button>
+                        {currentStep !== 'upload' && (
+                            <Button 
+                                variant="outline" 
+                                size="sm" 
+                                onClick={handleReset}
+                                className="gap-2"
+                            >
+                                <RefreshCw className="w-4 h-4" />
+                                Start Over
+                            </Button>
+                        )}
                     </div>
                 </header>
 
@@ -732,43 +686,38 @@ export function MatcherWorkspace({ currentStep, onStepChange }: MatcherWorkspace
                     </Suspense>
                 )}
 
-                {/* Column Mapper */}
-                {mappingTarget && (
-                    <ColumnMapper
-                        open={mapperOpen}
-                        onOpenChange={setMapperOpen}
-                        fileType={mappingTarget.type}
-                        fileName={mappingTarget.type === 'master' ? masterConfig?.fileName || '' : targetConfigs[mappingTarget.index]?.fileName || ''}
-                        headers={mappingTarget.type === 'master' ? masterConfig?.headers || [] : targetConfigs[mappingTarget.index]?.headers || []}
-                        previewData={mappingTarget.type === 'master' ? masterConfig?.preview || [] : targetConfigs[mappingTarget.index]?.preview || []}
-                        customers={customers}
-                        initialIdCol={mappingTarget.type === 'master' ? (masterConfig?.overrideIdColumn ?? -1) : (targetConfigs[mappingTarget.index]?.overrideIdColumn ?? -1)}
-                        initialResultCol={mappingTarget.type === 'master' ? (masterConfig?.overrideResultColumn ?? -1) : -1}
-                        initialMatchLabel={mappingTarget.type === 'target' ? targetConfigs[mappingTarget.index]?.matchLabel : undefined}
-                        onConfirm={handleConfirmMapping}
-                    />
-                )}
-
                 {/* Content */}
                 <ScrollArea className="flex-1">
                     <div className="p-6">
+                        {currentStep === 'upload' && (
+                            <Suspense fallback={<div className="flex items-center justify-center py-8"><Loader2 className="w-6 h-6 animate-spin" /></div>}>
+                                <MatcherUploadView
+                                    masterConfig={masterConfig}
+                                    targetConfigs={targetConfigs}
+                                    isAnalyzing={isAnalyzing}
+                                    handleSelectMaster={handleSelectMaster}
+                                    handleSelectTargets={handleSelectTargets}
+                                    removeTarget={removeTarget}
+                                    onContinue={handleContinueToConfig}
+                                />
+                            </Suspense>
+                        )}
+
                         {currentStep === 'configure' && (
                             <Suspense fallback={<div className="flex items-center justify-center py-8"><Loader2 className="w-6 h-6 animate-spin" /></div>}>
                                 <MatcherConfigureView
                                     masterConfig={masterConfig}
                                     targetConfigs={targetConfigs}
                                     noMatchLabel={noMatchLabel}
-                                    isAnalyzing={isAnalyzing}
                                     isProcessing={isProcessing}
                                     isReady={isReady}
+                                    customers={customers}
                                     setNoMatchLabel={setNoMatchLabel}
                                     setMasterConfig={setMasterConfig}
-                                    handleSelectMaster={handleSelectMaster}
-                                    handleSelectTargets={handleSelectTargets}
+                                    setTargetConfigs={setTargetConfigs}
                                     removeTarget={removeTarget}
-                                    setMappingTarget={setMappingTarget}
-                                    setMapperOpen={setMapperOpen}
                                     handleProcess={handleProcess}
+                                    onBack={() => onStepChange('upload')}
                                 />
                             </Suspense>
                         )}

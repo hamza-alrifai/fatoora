@@ -69,12 +69,12 @@ export function CustomerSheet({ isOpen, onClose, customer, onSave, onDelete, inv
         <Sheet isOpen={isOpen} onClose={onClose}>
             <div className="flex flex-col h-full bg-background/95 backdrop-blur-xl animate-in slide-in-from-right duration-300">
                 {/* Header */}
-                <div className="p-6 border-b border-white/10 bg-muted/5 flex items-start gap-4">
-                    <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary/80 to-purple-600 flex items-center justify-center shadow-lg shadow-primary/20 shrink-0">
-                        <User className="w-8 h-8 text-white" />
+                <div className="p-4 border-b border-white/10 bg-muted/5 flex items-start gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-indigo-600 flex items-center justify-center shadow-md shadow-indigo-500/20 shrink-0">
+                        <User className="w-5 h-5 text-white" />
                     </div>
-                    <div className="flex-1 pt-1">
-                        <h2 className="text-2xl font-bold tracking-tight mb-1">{formData.id ? 'Edit Customer' : 'New Customer'}</h2>
+                    <div className="flex-1 pt-0.5">
+                        <h2 className="text-lg font-bold tracking-tight mb-0.5">{formData.id ? 'Edit Customer' : 'New Customer'}</h2>
                         <p className="text-sm text-muted-foreground line-clamp-1">{formData.id ? `ID: ${formData.id.substring(0, 8)}...` : 'Add a new client to your database'}</p>
                     </div>
                     <Button variant="ghost" size="icon" onClick={onClose} className="rounded-full hover:bg-white/10 -mt-2 -mr-2">
@@ -86,11 +86,11 @@ export function CustomerSheet({ isOpen, onClose, customer, onSave, onDelete, inv
                 <div className="flex-1 overflow-y-auto">
                     <Tabs defaultValue="details" className="w-full">
 
-                        <div className="px-6 mb-2">
-                            <TabsList className="w-full justify-start bg-white/5 p-1 rounded-xl h-12 border border-white/5">
+                        <div className="px-4 mb-2">
+                            <TabsList className="w-full justify-start bg-white/5 p-1 rounded-lg h-9 border border-white/5">
                                 <TabsTrigger
                                     value="details"
-                                    className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary data-[state=active]:shadow-sm rounded-lg h-full px-6 font-medium transition-all"
+                                    className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary data-[state=active]:shadow-sm rounded-md h-full px-4 text-sm font-medium transition-all"
                                 >
                                     Details
                                 </TabsTrigger>
@@ -98,13 +98,13 @@ export function CustomerSheet({ isOpen, onClose, customer, onSave, onDelete, inv
                                     <>
                                         <TabsTrigger
                                             value="stats"
-                                            className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary data-[state=active]:shadow-sm rounded-lg h-full px-6 font-medium transition-all"
+                                            className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary data-[state=active]:shadow-sm rounded-md h-full px-4 text-sm font-medium transition-all"
                                         >
                                             Usage Stats
                                         </TabsTrigger>
                                         <TabsTrigger
                                             value="history"
-                                            className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary data-[state=active]:shadow-sm rounded-lg h-full px-6 font-medium transition-all"
+                                            className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary data-[state=active]:shadow-sm rounded-md h-full px-4 text-sm font-medium transition-all"
                                         >
                                             Invoices <Badge variant="secondary" className="ml-2 h-5 px-1.5 min-w-[1.25rem] bg-white/10 text-foreground">{invoices.length}</Badge>
                                         </TabsTrigger>
@@ -113,7 +113,7 @@ export function CustomerSheet({ isOpen, onClose, customer, onSave, onDelete, inv
                             </TabsList>
                         </div>
 
-                        <div className="p-6">
+                        <div className="p-4">
                             <TabsContent value="details" className="space-y-6 mt-0 animate-in fade-in slide-in-from-bottom-2 duration-300">
                                 <div className="grid gap-6">
                                     <div className="space-y-2">
@@ -124,7 +124,7 @@ export function CustomerSheet({ isOpen, onClose, customer, onSave, onDelete, inv
                                             <Input
                                                 value={formData.name}
                                                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                                                className="bg-muted/30 border-white/5 focus:bg-background h-12 text-lg px-4 transition-all group-hover:border-white/10"
+                                                className="bg-muted/30 border-white/5 focus:bg-background h-9 px-3 transition-all group-hover:border-white/10"
                                                 placeholder="Company or Individual Name"
                                                 autoFocus
                                             />
@@ -135,11 +135,11 @@ export function CustomerSheet({ isOpen, onClose, customer, onSave, onDelete, inv
                                         <div className="space-y-2">
                                             <label className="text-xs font-semibold uppercase text-muted-foreground">Email Address</label>
                                             <div className="relative group">
-                                                <Mail className="absolute left-3 top-3.5 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
+                                                <Mail className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
                                                 <Input
                                                     value={formData.email}
                                                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                                                    className="pl-10 bg-muted/30 border-white/5 focus:bg-background h-11 transition-all group-hover:border-white/10"
+                                                    className="pl-10 bg-muted/30 border-white/5 focus:bg-background h-9 transition-all group-hover:border-white/10"
                                                     placeholder="email@example.com"
                                                 />
                                             </div>
@@ -147,11 +147,11 @@ export function CustomerSheet({ isOpen, onClose, customer, onSave, onDelete, inv
                                         <div className="space-y-2">
                                             <label className="text-xs font-semibold uppercase text-muted-foreground">Phone Number</label>
                                             <div className="relative group">
-                                                <Phone className="absolute left-3 top-3.5 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
+                                                <Phone className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
                                                 <Input
                                                     value={formData.phone}
                                                     onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                                                    className="pl-10 bg-muted/30 border-white/5 focus:bg-background h-11 transition-all group-hover:border-white/10"
+                                                    className="pl-10 bg-muted/30 border-white/5 focus:bg-background h-9 transition-all group-hover:border-white/10"
                                                     placeholder="+974 ..."
                                                 />
                                             </div>
@@ -161,7 +161,7 @@ export function CustomerSheet({ isOpen, onClose, customer, onSave, onDelete, inv
                                     <div className="space-y-2">
                                         <label className="text-xs font-semibold uppercase text-muted-foreground">Billing Address</label>
                                         <textarea
-                                            className="w-full min-h-[120px] rounded-lg border border-white/5 bg-muted/30 px-4 py-3 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus:bg-background focus:ring-1 focus:ring-primary transition-all resize-none"
+                                            className="w-full min-h-[80px] rounded-lg border border-white/5 bg-muted/30 px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus:bg-background focus:ring-1 focus:ring-primary transition-all resize-none"
                                             value={formData.address}
                                             onChange={(e) => setFormData({ ...formData, address: e.target.value })}
                                             placeholder="Street address, PO Box, etc."
@@ -171,36 +171,36 @@ export function CustomerSheet({ isOpen, onClose, customer, onSave, onDelete, inv
                             </TabsContent>
 
                             <TabsContent value="stats" className="space-y-6 mt-0 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                                <div className="bg-gradient-to-br from-card/50 to-muted/20 rounded-xl p-6 border border-white/5 space-y-8">
-                                    <div className="flex items-center gap-3 mb-6 pb-4 border-b border-white/5">
+                                <div className="bg-gradient-to-br from-card/50 to-muted/20 rounded-xl p-4 border border-white/5 space-y-5">
+                                    <div className="flex items-center gap-3 mb-4 pb-3 border-b border-white/5">
                                         <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
                                             <Calculator className="w-5 h-5 text-primary" />
                                         </div>
                                         <div>
-                                            <h3 className="font-semibold text-lg">Material Usage</h3>
+                                            <h3 className="font-semibold text-sm">Material Usage</h3>
                                             <p className="text-xs text-muted-foreground">Track 10mm vs 20mm consumption</p>
                                         </div>
                                     </div>
 
-                                    <div className="grid grid-cols-2 gap-6">
-                                        <div className="p-5 rounded-xl bg-background/40 border border-white/5 hover:bg-background/60 transition-colors">
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="p-3 rounded-lg bg-background/40 border border-white/5 hover:bg-background/60 transition-colors">
                                             <div className="text-xs font-medium uppercase text-muted-foreground mb-2">Total 20mm</div>
                                             <div className="flex items-baseline gap-2">
                                                 <Input
                                                     type="number"
-                                                    className="text-3xl font-bold bg-transparent border-none p-0 h-auto shadow-none focus-visible:ring-0 w-full font-mono tracking-tight"
+                                                    className="text-xl font-bold bg-transparent border-none p-0 h-auto shadow-none focus-visible:ring-0 w-full font-mono tracking-tight"
                                                     value={formData.total20mm}
                                                     onChange={(e) => setFormData({ ...formData, total20mm: Number(e.target.value) })}
                                                 />
                                                 <span className="text-sm font-medium text-muted-foreground">tons</span>
                                             </div>
                                         </div>
-                                        <div className="p-5 rounded-xl bg-background/40 border border-white/5 hover:bg-background/60 transition-colors">
+                                        <div className="p-3 rounded-lg bg-background/40 border border-white/5 hover:bg-background/60 transition-colors">
                                             <div className="text-xs font-medium uppercase text-muted-foreground mb-2">Total 10mm</div>
                                             <div className="flex items-baseline gap-2">
                                                 <Input
                                                     type="number"
-                                                    className="text-3xl font-bold bg-transparent border-none p-0 h-auto shadow-none focus-visible:ring-0 w-full font-mono tracking-tight"
+                                                    className="text-xl font-bold bg-transparent border-none p-0 h-auto shadow-none focus-visible:ring-0 w-full font-mono tracking-tight"
                                                     value={formData.total10mm}
                                                     onChange={(e) => setFormData({ ...formData, total10mm: Number(e.target.value) })}
                                                 />
@@ -217,7 +217,7 @@ export function CustomerSheet({ isOpen, onClose, customer, onSave, onDelete, inv
                                             </span>
                                             <Badge
                                                 variant={stats.status === 'warning' ? 'outline' : 'default'}
-                                                className={`capitalize px-3 py-1 ${stats.status === 'warning' ? 'border-amber-500/50 text-amber-500 bg-amber-500/5' : 'bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30'}`}
+                                                className={`capitalize px-3 py-1 ${stats.status === 'warning' ? 'border-amber-500/50 text-amber-500 bg-amber-500/5' : 'bg-emerald-500/20 text-emerald-500 hover:bg-emerald-500/30'}`}
                                             >
                                                 {stats.status === 'warning' ? 'Optimization Needed' : 'Optimal Balance'}
                                             </Badge>
@@ -226,12 +226,12 @@ export function CustomerSheet({ isOpen, onClose, customer, onSave, onDelete, inv
                                         {/* Visual Bar */}
                                         <div className="space-y-2">
                                             <div className="h-3 w-full bg-secondary/30 rounded-full overflow-hidden flex ring-1 ring-white/5">
-                                                <div style={{ width: `${stats.ratio20}%` }} className="bg-blue-500 h-full transition-all duration-1000 ease-out" />
-                                                <div style={{ width: `${stats.ratio10}%` }} className="bg-slate-500 h-full transition-all duration-1000 ease-out" />
+                                                <div style={{ width: `${stats.ratio20}%` }} className="bg-indigo-500 h-full transition-all duration-1000 ease-out" />
+                                                <div style={{ width: `${stats.ratio10}%` }} className="bg-slate-400 h-full transition-all duration-1000 ease-out" />
                                             </div>
                                             <div className="flex justify-between text-xs font-medium text-muted-foreground px-1">
-                                                <span className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-blue-500" /> 20mm ({stats.ratio20.toFixed(1)}%)</span>
-                                                <span className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-slate-500" /> 10mm ({stats.ratio10.toFixed(1)}%)</span>
+                                                <span className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-indigo-500" /> 20mm ({stats.ratio20.toFixed(1)}%)</span>
+                                                <span className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-slate-400" /> 10mm ({stats.ratio10.toFixed(1)}%)</span>
                                             </div>
                                         </div>
 
@@ -264,7 +264,7 @@ export function CustomerSheet({ isOpen, onClose, customer, onSave, onDelete, inv
                                         invoices.map(inv => (
                                             <div key={inv.id} className="group flex items-center justify-between p-4 rounded-xl border border-white/5 bg-card/40 hover:bg-card/80 transition-all cursor-default">
                                                 <div className="flex items-center gap-4">
-                                                    <div className="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center font-mono text-xs font-bold text-blue-400">
+                                                    <div className="w-10 h-10 rounded-lg bg-indigo-500/10 flex items-center justify-center font-mono text-xs font-bold text-indigo-500">
                                                         INV
                                                     </div>
                                                     <div>
@@ -275,7 +275,7 @@ export function CustomerSheet({ isOpen, onClose, customer, onSave, onDelete, inv
                                                 <div className="text-right">
                                                     <div className="font-bold text-sm">{new Intl.NumberFormat('en-US', { style: 'currency', currency: inv.currency }).format(inv.total)}</div>
                                                     <Badge variant="secondary" className={`text-[10px] h-5 mt-1 capitalize ${inv.status === 'paid' ? 'bg-emerald-500/10 text-emerald-500' :
-                                                        inv.status === 'overdue' ? 'bg-red-500/10 text-red-500' : ''
+                                                        inv.status === 'overdue' ? 'bg-rose-500/10 text-rose-500' : ''
                                                         }`}>{inv.status}</Badge>
                                                 </div>
                                             </div>
