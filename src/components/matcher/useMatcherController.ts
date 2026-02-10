@@ -12,7 +12,7 @@ interface FileConfig extends FileAnalysis {
 }
 
 export function useMatcherController(params: {
-    onStepChange: (step: 'configure' | 'done') => void;
+    onStepChange: (step: 'configure' | 'upload' | 'done') => void;
 }) {
     const { onStepChange } = params;
 
@@ -271,10 +271,10 @@ export function useMatcherController(params: {
                 setMasterConfig(prev =>
                     prev
                         ? {
-                              ...prev,
-                              overrideIdColumn: idCol,
-                              overrideResultColumn: resultCol,
-                          }
+                            ...prev,
+                            overrideIdColumn: idCol,
+                            overrideResultColumn: resultCol,
+                        }
                         : null
                 );
             } else {
@@ -291,10 +291,10 @@ export function useMatcherController(params: {
                     prev.map((c, i) =>
                         i === mappingTarget.index
                             ? {
-                                  ...c,
-                                  overrideIdColumn: idCol,
-                                  matchLabel: matchLabel !== undefined ? matchLabel : c.matchLabel,
-                              }
+                                ...c,
+                                overrideIdColumn: idCol,
+                                matchLabel: matchLabel !== undefined ? matchLabel : c.matchLabel,
+                            }
                             : c
                     )
                 );

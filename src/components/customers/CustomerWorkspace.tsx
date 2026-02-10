@@ -1,13 +1,14 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
-import { Plus, Users, Search, Mail, Phone } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Plus, Users, Mail, Phone } from 'lucide-react';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { LoadingState } from '@/components/ui/LoadingState';
 import { toast } from 'sonner';
 import type { Customer, Invoice } from '@/types';
 import { CustomerSheet } from './CustomerSheet';
+import { TopBar } from '@/components/layout/TopBar';
 
 
 
@@ -113,134 +114,115 @@ export function CustomerWorkspace() {
     const totalCustomers = customers.length;
 
     return (
-        <div className="h-full bg-background overflow-y-auto">
-            <div className="max-w-[1400px] mx-auto px-5 py-5">
-                {/* Header */}
-                <div className="flex items-center justify-between mb-5">
-                    <div className="flex items-center gap-4">
-                        <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 to-indigo-600 flex items-center justify-center shadow-md shadow-indigo-500/20">
-                            <Users className="w-4 h-4 text-white" />
-                        </div>
-                        <div>
-                            <h1 className="text-xl font-bold tracking-tight">Customers</h1>
-                            <p className="text-sm text-muted-foreground">Manage your customer database</p>
-                        </div>
-                    </div>
-                    <Button onClick={handleCreateNew} className="gap-2">
-                        <Plus className="w-4 h-4" />
-                        New Customer
-                    </Button>
-                </div>
+        <div className="h-full bg-background overflow-y-auto relative">
+            <div className="min-h-full flex flex-col">
+                <TopBar
+                    title="Customers"
+                    subtitle="Manage your customer database"
+                    icon={Users}
+                    iconColor="from-indigo-500 to-indigo-600"
+                    searchProps={{
+                        value: searchQuery,
+                        onChange: (e) => setSearchQuery(e.target.value),
+                        placeholder: "Search customers..."
+                    }}
+                    actions={
+                        <Button onClick={handleCreateNew} className="gap-2">
+                            <Plus className="w-4 h-4" />
+                            New Customer
+                        </Button>
+                    }
+                />
 
-                {/* Stats Card */}
-                <div className="grid gap-4 md:grid-cols-3 mb-5">
-                    <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-indigo-500 to-indigo-600 p-4 text-white shadow-lg shadow-indigo-500/20">
-                        <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2" />
-                        <div className="relative">
-                            <div className="flex items-center gap-3 mb-3">
-                                <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
-                                    <Users className="w-5 h-5" />
-                                </div>
-                                <span className="text-indigo-200 font-medium">Total Customers</span>
-                            </div>
-                            <div className="text-2xl font-bold">{totalCustomers}</div>
+                <div className="p-5 space-y-5">
+                    {/* Customer List */}
+                    <Card className="overflow-hidden border-border/40 shadow-sm">
+                        <div className="bg-muted/30 border-b border-border/40 px-4 py-3 flex items-center justify-between">
+                            <h3 className="font-semibold text-sm text-foreground">All Customers</h3>
+                            <Badge variant="secondary" className="bg-background text-muted-foreground border-border/50">
+                                Total: {totalCustomers}
+                            </Badge>
                         </div>
-                    </div>
-                </div>
-
-                {/* Customer List */}
-                <Card className="overflow-hidden">
-                    <div className="p-3 border-b border-border/50 flex items-center gap-3">
-                        <div className="relative flex-1 max-w-md">
-                            <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                            <Input
-                                placeholder="Search customers..."
-                                className="pl-11"
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                            />
-                        </div>
-                    </div>
-
-                    <CardContent className="p-0">
-                        {isLoading ? (
-                            <LoadingState label="Loading customers…" />
-                        ) : filteredCustomers.length === 0 ? (
-                            <EmptyState
-                                title="No customers yet"
-                                description="Add your first customer to start creating invoices"
-                                icon={<Users className="h-8 w-8" />}
-                                action={
-                                    <Button onClick={handleCreateNew} variant="soft" className="gap-2">
-                                        <Plus className="w-4 h-4" />
-                                        Add Customer
-                                    </Button>
-                                }
-                            />
-                        ) : (
-                            <div className="divide-y divide-border/50">
-                                {filteredCustomers.map((cust) => (
-                                    <div
-                                        key={cust.id}
-                                        className="flex items-center justify-between px-4 py-3 hover:bg-muted/30 transition-colors cursor-pointer"
-                                        onClick={() => {
-                                            setSelectedCustomer(cust);
-                                            setIsSheetOpen(true);
-                                        }}
-                                    >
-                                        <div className="flex items-center gap-4">
-                                            <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-indigo-100 to-indigo-50 flex items-center justify-center">
-                                                <span className="text-sm font-bold text-indigo-600">
-                                                    {cust.name.charAt(0).toUpperCase()}
-                                                </span>
+                        <CardContent className="p-0">
+                            {isLoading ? (
+                                <LoadingState label="Loading customers…" />
+                            ) : filteredCustomers.length === 0 ? (
+                                <EmptyState
+                                    title="No customers yet"
+                                    description="Add your first customer to start creating invoices"
+                                    icon={<Users className="h-8 w-8" />}
+                                    action={
+                                        <Button onClick={handleCreateNew} variant="soft" className="gap-2">
+                                            <Plus className="w-4 h-4" />
+                                            Add Customer
+                                        </Button>
+                                    }
+                                />
+                            ) : (
+                                <div className="divide-y divide-border/50">
+                                    {filteredCustomers.map((cust) => (
+                                        <div
+                                            key={cust.id}
+                                            className="flex items-center justify-between px-4 py-3 hover:bg-muted/30 transition-colors cursor-pointer"
+                                            onClick={() => {
+                                                setSelectedCustomer(cust);
+                                                setIsSheetOpen(true);
+                                            }}
+                                        >
+                                            <div className="flex items-center gap-4">
+                                                <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-indigo-100 to-indigo-50 flex items-center justify-center">
+                                                    <span className="text-sm font-bold text-indigo-600">
+                                                        {cust.name.charAt(0).toUpperCase()}
+                                                    </span>
+                                                </div>
+                                                <div>
+                                                    <div className="font-semibold">{cust.name}</div>
+                                                    <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                                                        {cust.email && (
+                                                            <span className="flex items-center gap-1">
+                                                                <Mail className="w-3 h-3" />
+                                                                {cust.email}
+                                                            </span>
+                                                        )}
+                                                        {cust.phone && (
+                                                            <span className="flex items-center gap-1">
+                                                                <Phone className="w-3 h-3" />
+                                                                {cust.phone}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                </div>
                                             </div>
-                                            <div>
-                                                <div className="font-semibold">{cust.name}</div>
-                                                <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                                                    {cust.email && (
-                                                        <span className="flex items-center gap-1">
-                                                            <Mail className="w-3 h-3" />
-                                                            {cust.email}
-                                                        </span>
-                                                    )}
-                                                    {cust.phone && (
-                                                        <span className="flex items-center gap-1">
-                                                            <Phone className="w-3 h-3" />
-                                                            {cust.phone}
-                                                        </span>
-                                                    )}
+                                            <div className="flex items-center gap-6 text-right">
+                                                <div>
+                                                    <div className="text-xs text-muted-foreground">10mm</div>
+                                                    <div className="font-mono font-semibold">{(cust.total10mm || 0).toLocaleString()}</div>
+                                                </div>
+                                                <div>
+                                                    <div className="text-xs text-muted-foreground">20mm</div>
+                                                    <div className="font-mono font-semibold">{(cust.total20mm || 0).toLocaleString()}</div>
                                                 </div>
                                             </div>
                                         </div>
-                                        <div className="flex items-center gap-6 text-right">
-                                            <div>
-                                                <div className="text-xs text-muted-foreground">10mm</div>
-                                                <div className="font-mono font-semibold">{(cust.total10mm || 0).toLocaleString()}</div>
-                                            </div>
-                                            <div>
-                                                <div className="text-xs text-muted-foreground">20mm</div>
-                                                <div className="font-mono font-semibold">{(cust.total20mm || 0).toLocaleString()}</div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                    </CardContent>
-                </Card>
-            </div>
+                                    ))}
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
+                </div>
 
-            <CustomerSheet
-                isOpen={isSheetOpen}
-                customer={selectedCustomer}
-                invoices={customerInvoices}
-                onClose={() => {
-                    setIsSheetOpen(false);
-                    setSelectedCustomer(null);
-                }}
-                onSave={handleSave}
-                onDelete={(id) => handleDelete(id)}
-            />
+                <CustomerSheet
+                    isOpen={isSheetOpen}
+                    customer={selectedCustomer}
+                    invoices={customerInvoices}
+                    onClose={() => {
+                        setIsSheetOpen(false);
+                        setSelectedCustomer(null);
+                    }}
+                    onSave={handleSave}
+                    onDelete={(id) => handleDelete(id)}
+                />
+            </div>
         </div>
     );
 }

@@ -5,15 +5,10 @@ import {
     FileSpreadsheet,
     Settings,
     Receipt,
-    LayoutDashboard,
-    ChevronLeft,
-    ChevronRight
+    LayoutDashboard
 } from 'lucide-react';
 import {
-    Tooltip,
-    TooltipContent,
-    TooltipProvider,
-    TooltipTrigger,
+    TooltipProvider
 } from "@/components/ui/tooltip";
 
 interface NavItem {
@@ -30,8 +25,6 @@ interface AppShellProps {
 }
 
 export function AppShell({ children, activeTab, onTabChange }: AppShellProps) {
-    const [isCollapsed, setIsCollapsed] = React.useState(false);
-
     const navItems: NavItem[] = [
         { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, color: 'from-indigo-500 to-indigo-600' },
         { id: 'matcher', label: 'Reconciliation', icon: FileSpreadsheet, color: 'from-indigo-500 to-indigo-600' },
@@ -44,61 +37,39 @@ export function AppShell({ children, activeTab, onTabChange }: AppShellProps) {
         <TooltipProvider delayDuration={0}>
             <div className="flex h-screen w-screen overflow-hidden bg-background">
                 {/* Modern Sidebar */}
-                <aside
-                    className={cn(
-                        "relative flex-shrink-0 flex flex-col bg-card border-r border-border/50 z-20 transition-all duration-300 ease-out",
-                        isCollapsed ? "w-16" : "w-56"
-                    )}
-                >
+                <aside className="relative flex-shrink-0 flex flex-col bg-card border-r border-border/50 z-20 w-56">
                     {/* Drag Region */}
                     <div className="h-8 w-full shrink-0" style={{ WebkitAppRegion: 'drag' } as any} />
 
                     {/* Logo */}
-                    <div className={cn(
-                        "flex items-center gap-3 px-4 pb-5",
-                        isCollapsed && "justify-center px-0"
-                    )}>
-                        <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 to-indigo-600 flex items-center justify-center shadow-md shadow-indigo-500/25">
-                            <span className="text-white font-bold text-base">F</span>
+                    <div className="flex items-center gap-3 px-4 pb-5">
+                        <div className="animate-fade">
+                            <h1 className="text-3xl font-bold tracking-tight text-primary" style={{ fontFamily: '"Carter One", sans-serif' }}>Fatoora</h1>
                         </div>
-                        {!isCollapsed && (
-                            <div className="animate-fade">
-                                <h1 className="text-base font-bold tracking-tight">Fatoora</h1>
-                                <p className="text-[11px] text-muted-foreground font-medium">Invoice Platform</p>
-                            </div>
-                        )}
                     </div>
 
                     {/* Navigation */}
                     <nav className="flex-1 px-3 space-y-1.5">
-                        {!isCollapsed && (
-                            <div className="px-3 mb-4">
-                                <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
-                                    Menu
-                                </span>
-                            </div>
-                        )}
-                        
                         {navItems.map((item, index) => {
                             const Icon = item.icon;
                             const isActive = activeTab === item.id;
 
-                            const ButtonContent = (
+                            return (
                                 <button
+                                    key={item.id}
                                     onClick={() => onTabChange(item.id)}
                                     style={{ animationDelay: `${index * 50}ms` }}
                                     className={cn(
                                         "w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm font-semibold transition-all duration-200 group animate-slide-in",
                                         isActive
                                             ? "bg-gradient-to-r from-primary/10 to-primary/5 text-primary shadow-sm"
-                                            : "text-muted-foreground hover:text-foreground hover:bg-muted/50",
-                                        isCollapsed && "justify-center px-0"
+                                            : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
                                     )}
                                 >
                                     <div className={cn(
                                         "flex items-center justify-center w-8 h-8 rounded-lg transition-all duration-200",
-                                        isActive 
-                                            ? `bg-gradient-to-br ${item.color} shadow-lg` 
+                                        isActive
+                                            ? `bg-gradient-to-br ${item.color} shadow-lg`
                                             : "bg-muted/80 group-hover:bg-muted"
                                     )}>
                                         <Icon className={cn(
@@ -106,49 +77,14 @@ export function AppShell({ children, activeTab, onTabChange }: AppShellProps) {
                                             isActive ? "text-white" : "text-muted-foreground group-hover:text-foreground"
                                         )} />
                                     </div>
-                                    {!isCollapsed && (
-                                        <span className="flex-1 text-left">{item.label}</span>
-                                    )}
-                                    {!isCollapsed && isActive && (
+                                    <span className="flex-1 text-left">{item.label}</span>
+                                    {isActive && (
                                         <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
                                     )}
                                 </button>
                             );
-
-                            if (isCollapsed) {
-                                return (
-                                    <Tooltip key={item.id}>
-                                        <TooltipTrigger asChild>{ButtonContent}</TooltipTrigger>
-                                        <TooltipContent side="right" sideOffset={12} className="font-semibold">
-                                            {item.label}
-                                        </TooltipContent>
-                                    </Tooltip>
-                                );
-                            }
-
-                            return <React.Fragment key={item.id}>{ButtonContent}</React.Fragment>;
                         })}
                     </nav>
-
-                    {/* Collapse Toggle */}
-                    <div className="p-4 mt-auto">
-                        <button
-                            onClick={() => setIsCollapsed(!isCollapsed)}
-                            className={cn(
-                                "w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-all",
-                                isCollapsed && "px-0"
-                            )}
-                        >
-                            {isCollapsed ? (
-                                <ChevronRight className="w-4 h-4" />
-                            ) : (
-                                <>
-                                    <ChevronLeft className="w-4 h-4" />
-                                    <span>Collapse</span>
-                                </>
-                            )}
-                        </button>
-                    </div>
 
                     {/* Subtle gradient overlay at bottom */}
                     <div className="absolute bottom-0 left-0 right-0 h-20 bg-gradient-to-t from-card to-transparent pointer-events-none" />

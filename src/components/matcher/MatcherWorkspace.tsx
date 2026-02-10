@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import type { FileAnalysis, Customer } from '../../types.d';
 import { Loader2, RefreshCw, FileSpreadsheet } from 'lucide-react';
+import { TopBar } from '@/components/layout/TopBar';
 
 import { useMatcherState, type FileGenConfig } from '@/hooks/useMatcherState';
 import { parseQuantitySafe } from '@/utils/quantity-parser';
@@ -102,7 +103,7 @@ export function MatcherWorkspace({ currentStep, onStepChange }: MatcherWorkspace
             });
 
             setExecutiveSummary(summaryRows);
-            
+
             // Automatically export to Excel after generating
             const { exportExecutiveSummaryToExcel } = await import('@/utils/executive-summary-export');
             await exportExecutiveSummaryToExcel(summaryRows);
@@ -621,37 +622,29 @@ export function MatcherWorkspace({ currentStep, onStepChange }: MatcherWorkspace
     return (
         <div className="flex flex-col h-full bg-background overflow-hidden">
             <main className="flex-1 flex flex-col overflow-hidden">
-                {/* Premium Header */}
-                <header className="px-5 py-4 border-b border-border/50 bg-card/50">
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 to-indigo-600 flex items-center justify-center shadow-md shadow-indigo-500/20">
-                                <FileSpreadsheet className="w-4 h-4 text-white" />
-                            </div>
-                            <div>
-                                <h1 className="text-lg font-bold tracking-tight">
-                                    {currentStep === 'done' ? 'Reconciliation Complete' : 'Reconciliation'}
-                                </h1>
-                                <p className="text-xs text-muted-foreground">
-                                    {currentStep === 'upload' && 'Upload your Excel files to get started'}
-                                    {currentStep === 'configure' && 'Configure column mappings'}
-                                    {currentStep === 'done' && 'Review results and generate invoices'}
-                                </p>
-                            </div>
-                        </div>
-                        {currentStep !== 'upload' && (
-                            <Button 
-                                variant="outline" 
-                                size="sm" 
+                <TopBar
+                    title={currentStep === 'done' ? 'Reconciliation Complete' : 'Reconciliation'}
+                    subtitle={
+                        currentStep === 'upload' ? 'Upload your Excel files to get started' :
+                            currentStep === 'configure' ? 'Configure column mappings' :
+                                'Review results and generate invoices'
+                    }
+                    icon={FileSpreadsheet}
+                    iconColor="from-indigo-500 to-indigo-600"
+                    actions={
+                        currentStep !== 'upload' && (
+                            <Button
+                                variant="outline"
+                                size="sm"
                                 onClick={handleReset}
                                 className="gap-2"
                             >
                                 <RefreshCw className="w-4 h-4" />
                                 Start Over
                             </Button>
-                        )}
-                    </div>
-                </header>
+                        )
+                    }
+                />
 
                 {/* Invoice Generation Configuration Wizard */}
                 {(isCustomerDialogOpen && !isCreatingCustomer) && (

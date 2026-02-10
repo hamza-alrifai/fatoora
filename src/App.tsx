@@ -2,6 +2,7 @@ import { useState, lazy, Suspense } from 'react';
 import { Toaster } from 'sonner';
 import { AppShell } from '@/components/layout/AppShell';
 import { Loader2 } from 'lucide-react';
+import { ErrorBoundary } from '@/components/ui/ErrorBoundary';
 
 // Code splitting: lazy load workspace components
 const MatcherWorkspace = lazy(() => import('@/components/matcher/MatcherWorkspace').then(m => ({ default: m.MatcherWorkspace })));
@@ -55,22 +56,24 @@ function App() {
         activeTab={activeModule}
         onTabChange={(tabId: string) => setActiveModule(tabId as Module)}
       >
-        <Suspense fallback={<LoadingFallback />}>
-          {activeModule === 'dashboard' && <Dashboard />}
-          {activeModule === 'matcher' && (
-            <MatcherWorkspace
-              currentStep={matcherStep}
-              onStepChange={setMatcherStep}
-            />
-          )}
-          {activeModule === 'invoicing' && (
-            <InvoiceWorkspace
-              onNavigate={(mod) => setActiveModule(mod as Module)}
-            />
-          )}
-          {activeModule === 'customers' && <CustomerWorkspace />}
-          {activeModule === 'settings' && <SettingsWorkspace />}
-        </Suspense>
+        <ErrorBoundary>
+          <Suspense fallback={<LoadingFallback />}>
+            {activeModule === 'dashboard' && <Dashboard />}
+            {activeModule === 'matcher' && (
+              <MatcherWorkspace
+                currentStep={matcherStep}
+                onStepChange={setMatcherStep}
+              />
+            )}
+            {activeModule === 'invoicing' && (
+              <InvoiceWorkspace
+                onNavigate={(mod) => setActiveModule(mod as Module)}
+              />
+            )}
+            {activeModule === 'customers' && <CustomerWorkspace />}
+            {activeModule === 'settings' && <SettingsWorkspace />}
+          </Suspense>
+        </ErrorBoundary>
       </AppShell>
     </>
   );
