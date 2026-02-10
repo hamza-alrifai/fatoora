@@ -3,7 +3,7 @@ import { app, BrowserWindow, ipcMain, dialog, shell, nativeImage } from 'electro
 import path from 'path';
 import * as XLSX from 'xlsx';
 import fs from 'fs';
-import { v4 as uuidv4 } from 'uuid';
+import crypto from 'crypto';
 import { PDFDocument } from 'pdf-lib';
 import { aggregateInvoiceItems, extractDateString, getTodayString, isInvoiceOverdue } from './utils/invoice-utils';
 
@@ -56,7 +56,7 @@ async function getDB() {
     if (!Array.isArray(dbInstance.data.products) || dbInstance.data.products.length === 0) {
         dbInstance.data.products = [
             {
-                id: uuidv4(),
+                id: crypto.randomUUID(),
                 name: '20mm Gabbro',
                 description: 'Gabbro aggregate 20mm',
                 rate: 0,
@@ -65,7 +65,7 @@ async function getDB() {
                 updatedAt: new Date().toISOString(),
             },
             {
-                id: uuidv4(),
+                id: crypto.randomUUID(),
                 name: '10mm Gabbro',
                 description: 'Gabbro aggregate 10mm',
                 rate: 0,
@@ -87,7 +87,7 @@ ipcMain.handle('customer:save', async (_, customer: any) => {
     try {
         const db = await getDB();
         if (!customer.id) {
-            customer.id = uuidv4();
+            customer.id = crypto.randomUUID();
             customer.createdAt = new Date().toISOString();
         }
         customer.updatedAt = new Date().toISOString();
@@ -156,7 +156,7 @@ ipcMain.handle('invoice:save', async (_, invoice: any) => {
 
         const isNew = !invoice.id;
         if (isNew) {
-            invoice.id = uuidv4();
+            invoice.id = crypto.randomUUID();
             invoice.createdAt = new Date().toISOString();
         }
         invoice.updatedAt = new Date().toISOString();
@@ -264,7 +264,7 @@ ipcMain.handle('product:save', async (_, product: any) => {
     try {
         const db = await getDB();
         if (!product.id) {
-            product.id = uuidv4();
+            product.id = crypto.randomUUID();
             product.createdAt = new Date().toISOString();
         }
         product.updatedAt = new Date().toISOString();
