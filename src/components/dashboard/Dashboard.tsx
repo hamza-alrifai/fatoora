@@ -11,7 +11,9 @@ export function Dashboard() {
         revenue: 0,
         customers: 0,
         outstanding: 0,
-        activeInvoices: 0
+        activeInvoices: 0,
+        revenueTrend: 0,
+        trendingUp: true
     });
     const [recentInvoices, setRecentInvoices] = useState<Invoice[]>([]);
     const [allInvoices, setAllInvoices] = useState<Invoice[]>([]);
@@ -33,11 +35,52 @@ export function Dashboard() {
                 const invoices = invResult.invoices;
                 setAllInvoices(invoices);
 
-                const revenue = invoices.reduce((acc, inv) => acc + inv.total, 0);
+                // --- Metric Calculations ---
+                const validInvoices = invoices.filter(inv => inv.status !== 'draft');
+
+                // 1. Total Revenue (All time or this year? Usually total for dashboard, or YTD. Let's stick to Total for now as per previous dummy)
+                // Actually, "Total Revenue" usually implies all time.
+                const revenue = validInvoices.reduce((acc, inv) => acc + inv.total, 0);
+
+                // 2. Outstanding
                 const outstanding = invoices
                     .filter(inv => inv.status !== 'paid' && inv.status !== 'draft')
                     .reduce((acc, inv) => acc + inv.total, 0);
+
+                // 3. Active Invoices Count
                 const activeInvoices = invoices.filter(inv => inv.status !== 'paid' && inv.status !== 'draft').length;
+
+                // 4. Revenue Trend (Current Month vs Last Month)
+                const now = new Date();
+                const currentMonth = now.getMonth();
+                const currentYear = now.getFullYear();
+
+                const lastMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+                const lastMonth = lastMonthDate.getMonth();
+                const lastMonthYear = lastMonthDate.getFullYear();
+
+                let currentMonthRevenue = 0;
+                let lastMonthRevenue = 0;
+
+                validInvoices.forEach(inv => {
+                    const d = new Date(inv.date || inv.createdAt); // prefer issue date
+                    if (d.getMonth() === currentMonth && d.getFullYear() === currentYear) {
+                        currentMonthRevenue += inv.total;
+                    } else if (d.getMonth() === lastMonth && d.getFullYear() === lastMonthYear) {
+                        lastMonthRevenue += inv.total;
+                    }
+                });
+
+                let revenueTrend = 0;
+                let trendingUp = true;
+
+                if (lastMonthRevenue === 0) {
+                    revenueTrend = currentMonthRevenue > 0 ? 100 : 0;
+                } else {
+                    revenueTrend = ((currentMonthRevenue - lastMonthRevenue) / lastMonthRevenue) * 100;
+                }
+
+                trendingUp = revenueTrend >= 0;
 
                 const sorted = [...invoices].sort((a, b) => new Date(b.createdAt || b.date).getTime() - new Date(a.createdAt || a.date).getTime());
                 setRecentInvoices(sorted.slice(0, 5));
@@ -46,7 +89,9 @@ export function Dashboard() {
                     ...prev,
                     revenue,
                     outstanding,
-                    activeInvoices
+                    activeInvoices,
+                    revenueTrend,
+                    trendingUp
                 }));
             }
 
@@ -87,9 +132,9 @@ export function Dashboard() {
                                     <div className="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center shadow-inner border border-white/10">
                                         <TrendingUp className="w-6 h-6 text-white" />
                                     </div>
-                                    <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 backdrop-blur-md border border-white/10 text-emerald-50 text-xs font-semibold">
-                                        <ArrowUpRight className="w-3.5 h-3.5" />
-                                        +12% this month
+                                    <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full backdrop-blur-md border border-white/10 text-xs font-semibold ${stats.trendingUp ? 'bg-white/10 text-emerald-50' : 'bg-red-500/20 text-red-50'}`}>
+                                        <ArrowUpRight className={`w-3.5 h-3.5 ${stats.trendingUp ? '' : 'rotate-180'}`} />
+                                        {Math.abs(stats.revenueTrend).toFixed(0)}% this month
                                     </div>
                                 </div>
 

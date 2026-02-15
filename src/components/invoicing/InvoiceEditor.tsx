@@ -1,12 +1,12 @@
-import { useState, useEffect } from 'react';
-import type { Invoice, Customer, BankingDetails } from '@/types';
+import { useState } from 'react';
+import type { Invoice } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Save, Trash2, Printer, Receipt } from 'lucide-react';
-import { sanitizeAndConsolidateItems, recalculateInvoiceTotals } from '@/utils/invoice-item-utils';
 import { InvoiceIssueDialog } from './InvoiceIssueDialog';
 import { InvoiceItemsTable } from './InvoiceItemsTable';
 import { Badge } from '@/components/ui/badge';
+import { useInvoiceEditor } from '@/hooks/invoicing/useInvoiceEditor';
 
 
 interface InvoiceEditorProps {
@@ -17,89 +17,16 @@ interface InvoiceEditorProps {
 }
 
 export function InvoiceEditor({ invoice: initialInvoice, onSave, onDelete, onGeneratePDF }: InvoiceEditorProps) {
-    const [invoice, setInvoice] = useState<Invoice>(() => ({
-        ...initialInvoice,
-        items: initialInvoice.items.map(item => ({
-            ...item,
-            quantity: Math.round(item.quantity * 100) / 100,
-            amount: Math.round(item.amount * 100) / 100
-        }))
-    }));
-    const [customers, setCustomers] = useState<Customer[]>([]);
-    const [bankingDetails, setBankingDetails] = useState<BankingDetails | null>(null);
+    const {
+        invoice,
+        setInvoice,
+        bankingDetails,
+        isLocked,
+        handleChange,
+        handleSave
+    } = useInvoiceEditor({ initialInvoice, onSave });
+
     const [showIssueDialog, setShowIssueDialog] = useState(false);
-    
-    // Invoice is locked if it's not a draft
-    const isLocked = invoice.status !== 'draft';
-
-    useEffect(() => {
-        setInvoice(sanitizeAndConsolidateItems(initialInvoice));
-    }, [initialInvoice]);
-
-    useEffect(() => {
-        loadCustomers();
-        loadBankingDetails();
-    }, []);
-
-    // Sync customer details when customers list loads (to update old drafts)
-    useEffect(() => {
-        if (invoice.to.customerId && customers.length > 0) {
-            const customer = customers.find(c => c.id === invoice.to.customerId);
-            if (customer) {
-                // Check if we need to update to avoid infinite loops (simple equality check)
-                const needsUpdate =
-                    invoice.to.name !== customer.name ||
-                    invoice.to.address !== customer.address ||
-                    invoice.to.phone !== (customer.phone || '') ||
-                    invoice.to.email !== (customer.email || '');
-
-                if (needsUpdate) {
-                    console.log('Auto-syncing customer details from DB...');
-                    setInvoice(prev => ({
-                        ...prev,
-                        to: {
-                            ...prev.to,
-                            name: customer.name,
-                            address: customer.address,
-                            email: customer.email || '',
-                            phone: customer.phone || ''
-                        }
-                    }));
-                }
-            }
-        }
-    }, [customers, invoice.to.customerId]);
-
-    const loadBankingDetails = async () => {
-        const result = await window.electron.getBankingDetails();
-        if (result.success && result.data) {
-            setBankingDetails(result.data);
-        }
-    };
-
-    const loadCustomers = async () => {
-        try {
-            console.log('Fetching customers...');
-            const result = await window.electron.getCustomers();
-            console.log('Customers fetch result:', result);
-            if (result.success && result.customers) {
-                setCustomers(result.customers);
-            }
-        } catch (error) {
-            console.error('Failed to load customers:', error);
-        }
-    };
-
-    const handleChange = (field: keyof Invoice, value: any) => {
-        if (isLocked) return; // Prevent changes to locked invoices
-        setInvoice(prev => ({ ...prev, [field]: value }));
-    };
-
-
-
-    const handleSave = () => {
-        onSave(recalculateInvoiceTotals(invoice));
-    };
 
 
 
@@ -113,8 +40,8 @@ export function InvoiceEditor({ invoice: initialInvoice, onSave, onDelete, onGen
                     <span className="font-bold text-sm text-foreground">
                         {invoice.number === 'DRAFT' ? 'New Invoice' : invoice.number}
                     </span>
-                    <Badge 
-                        variant={invoice.status === 'paid' ? 'default' : invoice.status === 'issued' ? 'secondary' : 'outline'} 
+                    <Badge
+                        variant={invoice.status === 'paid' ? 'default' : invoice.status === 'issued' ? 'secondary' : 'outline'}
                         className="uppercase text-[10px] h-5"
                     >
                         {invoice.status}

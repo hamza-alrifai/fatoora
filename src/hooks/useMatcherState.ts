@@ -5,7 +5,7 @@
 
 import { useState, useEffect } from 'react';
 import type { FileAnalysis } from '../types.d';
-import type { CustomerSummary } from '@/utils/executive-summary-utils';
+
 
 interface FileConfig extends FileAnalysis {
     matchLabel?: string;
@@ -41,9 +41,7 @@ interface MatcherState {
     fileGenConfigs: Record<string, FileGenConfig>;
     outputFileHeaders: { name: string; index: number }[];
     outputFileData: any[][];
-    executiveSummary: CustomerSummary[] | null;
-    groupTotals: Record<string, { total: number; t10: number; t20: number }>;
-    uniqueMatchValues: string[];
+
 }
 
 const STORAGE_KEY = 'fatoora_matcher_state';
@@ -58,9 +56,7 @@ export function useMatcherState(onStepChange: (step: 'upload' | 'configure' | 'd
     const [fileGenConfigs, setFileGenConfigs] = useState<Record<string, FileGenConfig>>({});
     const [outputFileHeaders, setOutputFileHeaders] = useState<{ name: string; index: number }[]>([]);
     const [outputFileData, setOutputFileData] = useState<any[][]>([]);
-    const [executiveSummary, setExecutiveSummary] = useState<CustomerSummary[] | null>(null);
-    const [groupTotals, setGroupTotals] = useState<Record<string, { total: number; t10: number; t20: number }>>({});
-    const [uniqueMatchValues, setUniqueMatchValues] = useState<string[]>([]);
+
     const [isHydrated, setIsHydrated] = useState(false);
 
     // Load state from localStorage on mount
@@ -79,9 +75,7 @@ export function useMatcherState(onStepChange: (step: 'upload' | 'configure' | 'd
                 if (data.fileGenConfigs) setFileGenConfigs(data.fileGenConfigs);
                 if (data.outputFileHeaders) setOutputFileHeaders(data.outputFileHeaders);
                 if (data.outputFileData) setOutputFileData(data.outputFileData);
-                if (data.executiveSummary) setExecutiveSummary(data.executiveSummary);
-                if (data.groupTotals) setGroupTotals(data.groupTotals);
-                if (data.uniqueMatchValues) setUniqueMatchValues(data.uniqueMatchValues);
+
 
                 if (data.stats && data.stats.totalMasterRows > 0) {
                     onStepChange('done');
@@ -113,9 +107,7 @@ export function useMatcherState(onStepChange: (step: 'upload' | 'configure' | 'd
                 fileGenConfigs,
                 outputFileHeaders,
                 outputFileData: safeOutputData,
-                executiveSummary,
-                groupTotals,
-                uniqueMatchValues
+
             };
             localStorage.setItem(STORAGE_KEY, JSON.stringify(stateToSave));
         } catch (e) {
@@ -132,9 +124,7 @@ export function useMatcherState(onStepChange: (step: 'upload' | 'configure' | 'd
         fileGenConfigs,
         outputFileHeaders,
         outputFileData,
-        executiveSummary,
-        groupTotals,
-        uniqueMatchValues
+
     ]);
 
     const reset = () => {
@@ -148,9 +138,7 @@ export function useMatcherState(onStepChange: (step: 'upload' | 'configure' | 'd
         setOutputFileHeaders([]);
         setOutputFileData([]);
         setFileGenConfigs({});
-        setExecutiveSummary(null);
-        setGroupTotals({});
-        setUniqueMatchValues([]);
+
     };
 
     return {
@@ -172,12 +160,7 @@ export function useMatcherState(onStepChange: (step: 'upload' | 'configure' | 'd
         setOutputFileHeaders,
         outputFileData,
         setOutputFileData,
-        executiveSummary,
-        setExecutiveSummary,
-        groupTotals,
-        setGroupTotals,
-        uniqueMatchValues,
-        setUniqueMatchValues,
+
         isHydrated,
         reset,
     };

@@ -11,6 +11,14 @@ import { LoadingState } from '@/components/ui/LoadingState';
 import type { Invoice } from '@/types';
 import { InvoiceEditor } from './InvoiceEditor';
 import { format } from 'date-fns';
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from "@/components/ui/table";
 
 interface InvoiceWorkspaceProps {
     onNavigate?: (module: string) => void;
@@ -306,46 +314,54 @@ export function InvoiceWorkspace({ onNavigate }: InvoiceWorkspaceProps) {
                                     }
                                 />
                             ) : (
-                                <div className="divide-y divide-border/50">
-                                    {filteredInvoices.map((inv) => (
-                                        <div
-                                            key={inv.id}
-                                            className="flex items-center justify-between px-4 py-3 hover:bg-muted/30 transition-colors cursor-pointer"
-                                            onClick={() => handleEdit(inv)}
-                                        >
-                                            <div className="flex items-center gap-4">
-                                                <div className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center">
-                                                    <span className="font-mono text-xs font-bold text-muted-foreground">
-                                                        {inv.number.slice(-3)}
-                                                    </span>
-                                                </div>
-                                                <div>
-                                                    <div className="font-semibold">{inv.to.name}</div>
-                                                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead className="w-[100px]">Invoice #</TableHead>
+                                            <TableHead>Client</TableHead>
+                                            <TableHead>Date</TableHead>
+                                            <TableHead>Status</TableHead>
+                                            <TableHead className="text-right">Amount</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {filteredInvoices.map((inv) => (
+                                            <TableRow
+                                                key={inv.id}
+                                                className="cursor-pointer hover:bg-muted/50"
+                                                onClick={() => handleEdit(inv)}
+                                            >
+                                                <TableCell className="font-mono font-medium">
+                                                    {inv.number}
+                                                </TableCell>
+                                                <TableCell className="font-medium">
+                                                    {inv.to.name}
+                                                </TableCell>
+                                                <TableCell>
+                                                    <div className="flex items-center gap-2 text-muted-foreground">
                                                         <Calendar className="w-3 h-3" />
                                                         {format(new Date(inv.date), 'MMM d, yyyy')}
                                                     </div>
-                                                </div>
-                                            </div>
-                                            <div className="flex items-center gap-6">
-                                                <div className="text-right">
-                                                    <div className="font-bold">{(inv.total || 0).toLocaleString()}</div>
-                                                    <div className="text-xs text-muted-foreground">{inv.currency}</div>
-                                                </div>
-                                                <Badge
-                                                    variant={
-                                                        inv.status === 'paid' ? 'success' :
-                                                            inv.status === 'overdue' ? 'destructive' :
-                                                                inv.status === 'issued' ? 'info' : 'muted'
-                                                    }
-                                                    className="capitalize"
-                                                >
-                                                    {inv.status}
-                                                </Badge>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <Badge
+                                                        variant={
+                                                            inv.status === 'paid' ? 'success' :
+                                                                inv.status === 'overdue' ? 'destructive' :
+                                                                    inv.status === 'issued' ? 'info' : 'muted'
+                                                        }
+                                                        className="capitalize shadow-none"
+                                                    >
+                                                        {inv.status}
+                                                    </Badge>
+                                                </TableCell>
+                                                <TableCell className="text-right font-bold">
+                                                    {inv.currency} {(inv.total || 0).toLocaleString()}
+                                                </TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
                             )}
                         </CardContent>
                     </Card>

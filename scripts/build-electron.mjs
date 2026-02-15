@@ -21,6 +21,10 @@ await build({
   external: [
     'electron',
     'better-sqlite3',
+    'lowdb/node',
+    'xlsx',
+    'pdfmake',
+    'pdf-lib',
   ],
   define: {
     'import.meta.url': 'undefined',

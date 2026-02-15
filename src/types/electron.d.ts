@@ -201,37 +201,38 @@ export interface BackupResult {
 
 export interface ElectronAPI {
     openFileDialog(options: FileDialogOptions): Promise<FileDialogResult>;
+    openDirectoryDialog(): Promise<FileDialogResult>;
     saveFileDialog(defaultName: string): Promise<SaveDialogResult>;
     readExcelPreview(filePath: string): Promise<ExcelPreviewResult>;
     analyzeExcelFile(filePath: string): Promise<FileAnalysisResult>;
     processExcelFiles(options: ProcessExcelOptions): Promise<ProcessExcelResult>;
     openFile(filePath: string): Promise<void>;
-    
+
     // Customer operations
     getCustomers(): Promise<CustomersResult>;
     saveCustomer(customer: Customer): Promise<SaveCustomerResult>;
     deleteCustomer(id: string): Promise<DeleteResult>;
-    
+
     // Product operations
     getProducts(): Promise<ProductsResult>;
     saveProduct(product: Product): Promise<SaveCustomerResult>;
     deleteProduct(id: string): Promise<DeleteResult>;
-    
+
     // Invoice operations
     getInvoices(): Promise<InvoicesResult>;
     saveInvoice(invoice: Invoice): Promise<SaveInvoiceResult>;
     deleteInvoice(id: string): Promise<DeleteResult>;
     generateSecureInvoice(invoice: Invoice, appUrl: string): Promise<GenerateInvoiceResult>;
-    
+
     // Banking details
     getBankingDetails(): Promise<BankingDetailsResult>;
     saveBankingDetails(details: BankingDetails): Promise<SaveCustomerResult>;
-    
+
     // Backup/Restore
     exportBackup(): Promise<BackupResult>;
     importBackup(): Promise<BackupResult>;
     clearAllData(): Promise<DeleteResult>;
-    
+
     // Event listeners for background services
     on(channel: string, callback: (...args: any[]) => void): void;
     removeListener(channel: string, callback: (...args: any[]) => void): void;

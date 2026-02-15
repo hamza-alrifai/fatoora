@@ -44,11 +44,6 @@ export default function MatcherUploadView({
                     <div className="w-5 h-5 rounded-full bg-muted text-muted-foreground flex items-center justify-center text-xs font-bold">2</div>
                     Configure
                 </div>
-                <div className="w-8 h-px bg-border" />
-                <div className="flex items-center gap-1.5 opacity-40">
-                    <div className="w-5 h-5 rounded-full bg-muted text-muted-foreground flex items-center justify-center text-xs font-bold">3</div>
-                    Process
-                </div>
             </div>
 
             {/* Upload Cards */}
@@ -57,29 +52,28 @@ export default function MatcherUploadView({
                 <div
                     onClick={handleSelectMaster}
                     className={cn(
-                        "group relative cursor-pointer rounded-2xl p-8 transition-all duration-300 min-h-[220px] flex flex-col items-center justify-center",
-                        "border-2 border-dashed hover:border-solid",
+                        "group relative cursor-pointer rounded-xl p-8 transition-all duration-200 min-h-[200px] flex flex-col items-center justify-center border-2 border-dashed",
                         masterConfig
-                            ? "bg-gradient-to-br from-indigo-50 to-indigo-100/50 border-indigo-300 shadow-lg shadow-indigo-500/10"
-                            : "bg-muted/20 border-border hover:border-indigo-400 hover:bg-indigo-50/30"
+                            ? "bg-indigo-50/30 border-indigo-200"
+                            : "bg-muted/10 border-muted-foreground/20 hover:border-indigo-300 hover:bg-muted/20"
                     )}
                 >
                     <div className="flex flex-col items-center text-center space-y-4">
                         <div className={cn(
-                            "w-16 h-16 rounded-2xl flex items-center justify-center transition-all duration-300",
+                            "w-12 h-12 rounded-lg flex items-center justify-center transition-all duration-200",
                             masterConfig
-                                ? "bg-gradient-to-br from-indigo-500 to-indigo-600 text-white shadow-lg shadow-indigo-500/30"
-                                : "bg-muted text-muted-foreground group-hover:bg-indigo-100 group-hover:text-indigo-600"
+                                ? "bg-indigo-100 text-indigo-600"
+                                : "bg-muted text-muted-foreground group-hover:bg-indigo-50 group-hover:text-indigo-500"
                         )}>
-                            {masterConfig ? <Check className="w-7 h-7" /> : <Upload className="w-7 h-7" />}
+                            {masterConfig ? <Check className="w-6 h-6" /> : <Upload className="w-6 h-6" />}
                         </div>
                         <div>
-                            <h3 className="text-lg font-bold mb-1">
+                            <h3 className="text-base font-semibold mb-1">
                                 {masterConfig ? 'Master File Ready' : 'Upload Master File'}
                             </h3>
                             {masterConfig ? (
-                                <div className="space-y-1.5">
-                                    <Badge className="bg-indigo-100 text-indigo-700 border-0 max-w-[220px] truncate">{masterConfig.fileName}</Badge>
+                                <div className="space-y-1">
+                                    <Badge variant="secondary" className="font-normal bg-indigo-50 text-indigo-700 hover:bg-indigo-50 border-0 max-w-[200px] truncate">{masterConfig.fileName}</Badge>
                                     <p className="text-xs text-muted-foreground">{masterConfig.dataRowCount} rows • Click to replace</p>
                                 </div>
                             ) : (
@@ -93,25 +87,24 @@ export default function MatcherUploadView({
                 <div
                     onClick={handleSelectTargets}
                     className={cn(
-                        "group relative cursor-pointer rounded-2xl p-8 transition-all duration-300 min-h-[220px] flex flex-col items-center justify-center",
-                        "border-2 border-dashed hover:border-solid",
+                        "group relative cursor-pointer rounded-xl p-8 transition-all duration-200 min-h-[200px] flex flex-col items-center justify-center border-2 border-dashed",
                         targetConfigs.length > 0
-                            ? "bg-gradient-to-br from-indigo-50/80 to-indigo-100/40 border-indigo-200 shadow-lg shadow-indigo-500/10"
-                            : "bg-muted/20 border-border hover:border-indigo-300 hover:bg-indigo-50/20"
+                            ? "bg-indigo-50/30 border-indigo-200"
+                            : "bg-muted/10 border-muted-foreground/20 hover:border-indigo-300 hover:bg-muted/20"
                     )}
                 >
                     <div className="flex flex-col items-center text-center space-y-4">
                         <div className={cn(
-                            "w-16 h-16 rounded-2xl flex items-center justify-center transition-all duration-300",
+                            "w-12 h-12 rounded-lg flex items-center justify-center transition-all duration-200",
                             targetConfigs.length > 0
-                                ? "bg-gradient-to-br from-indigo-500 to-indigo-600 text-white shadow-lg shadow-indigo-500/30"
-                                : "bg-muted text-muted-foreground group-hover:bg-indigo-100 group-hover:text-indigo-600"
+                                ? "bg-indigo-100 text-indigo-600"
+                                : "bg-muted text-muted-foreground group-hover:bg-indigo-50 group-hover:text-indigo-500"
                         )}>
-                            {targetConfigs.length > 0 ? <Files className="w-7 h-7" /> : <Plus className="w-7 h-7" />}
+                            {targetConfigs.length > 0 ? <Files className="w-6 h-6" /> : <Plus className="w-6 h-6" />}
                         </div>
                         <div>
-                            <h3 className="text-lg font-bold mb-1">
-                                {targetConfigs.length > 0 ? `${targetConfigs.length} Customer File${targetConfigs.length > 1 ? 's' : ''}` : 'Add Customer Files'}
+                            <h3 className="text-base font-semibold mb-1">
+                                {targetConfigs.length > 0 ? `${targetConfigs.length} Customer File${targetConfigs.length > 1 ? 's' : ''}` : 'Upload Customer Files'}
                             </h3>
                             {targetConfigs.length > 0 ? (
                                 <p className="text-sm text-muted-foreground">Click to add more files</p>
@@ -172,9 +165,9 @@ export default function MatcherUploadView({
                     Continue to Configuration
                     <ArrowRight className="w-4 h-4" />
                 </Button>
-                {!canContinue && !isAnalyzing && (
+                {!canContinue && !isAnalyzing && masterConfig && (
                     <p className="text-xs text-muted-foreground text-center mt-2">
-                        {!masterConfig ? 'Upload a master file to continue' : 'Add at least one customer file'}
+                        Add at least one customer file
                     </p>
                 )}
             </div>

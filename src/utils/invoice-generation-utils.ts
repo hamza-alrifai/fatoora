@@ -3,11 +3,14 @@ import type { FileGenConfig } from '@/hooks/useMatcherState';
 import { detectProductType } from './product-type-utils';
 import { parseQuantitySafe } from './quantity-parser';
 
+import type { ReconciliationResult } from './reconciliation-engine';
+
 export interface InvoiceGenerationParams {
     outputFileHeaders: Array<{ name: string; index: number }>;
     outputFileData: any[][];
     fileGenConfigs: Record<string, FileGenConfig>;
-    uniqueMatchValues: string[];
+    reconciliationResult: ReconciliationResult;
+    matchValues: string[];
     noMatchLabel: string;
     customers: Customer[];
 }
@@ -55,7 +58,7 @@ export async function generateInvoicesFromReconciliation(
         const type = detectProductType(description, fullRowText);
         const rate = 0;
 
-        const quantity = qtyIdx !== -1 && qtyIdx < row.length 
+        const quantity = qtyIdx !== -1 && qtyIdx < row.length
             ? parseQuantitySafe(row[qtyIdx])
             : 0;
 

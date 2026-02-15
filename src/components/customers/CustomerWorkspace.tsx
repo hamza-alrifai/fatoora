@@ -9,6 +9,14 @@ import { toast } from 'sonner';
 import type { Customer, Invoice } from '@/types';
 import { CustomerSheet } from './CustomerSheet';
 import { TopBar } from '@/components/layout/TopBar';
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from "@/components/ui/table";
 
 
 
@@ -159,53 +167,62 @@ export function CustomerWorkspace() {
                                     }
                                 />
                             ) : (
-                                <div className="divide-y divide-border/50">
-                                    {filteredCustomers.map((cust) => (
-                                        <div
-                                            key={cust.id}
-                                            className="flex items-center justify-between px-4 py-3 hover:bg-muted/30 transition-colors cursor-pointer"
-                                            onClick={() => {
-                                                setSelectedCustomer(cust);
-                                                setIsSheetOpen(true);
-                                            }}
-                                        >
-                                            <div className="flex items-center gap-4">
-                                                <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-indigo-100 to-indigo-50 flex items-center justify-center">
-                                                    <span className="text-sm font-bold text-indigo-600">
-                                                        {cust.name.charAt(0).toUpperCase()}
-                                                    </span>
-                                                </div>
-                                                <div>
-                                                    <div className="font-semibold">{cust.name}</div>
-                                                    <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead>Customer</TableHead>
+                                            <TableHead>Contact Info</TableHead>
+                                            <TableHead className="text-right">10mm Qty</TableHead>
+                                            <TableHead className="text-right">20mm Qty</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {filteredCustomers.map((cust) => (
+                                            <TableRow
+                                                key={cust.id}
+                                                className="cursor-pointer hover:bg-muted/50"
+                                                onClick={() => {
+                                                    setSelectedCustomer(cust);
+                                                    setIsSheetOpen(true);
+                                                }}
+                                            >
+                                                <TableCell>
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-100 to-indigo-50 flex items-center justify-center">
+                                                            <span className="text-sm font-bold text-indigo-600">
+                                                                {cust.name.charAt(0).toUpperCase()}
+                                                            </span>
+                                                        </div>
+                                                        <span className="font-semibold">{cust.name}</span>
+                                                    </div>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <div className="flex flex-col gap-1 text-sm text-muted-foreground">
                                                         {cust.email && (
-                                                            <span className="flex items-center gap-1">
+                                                            <span className="flex items-center gap-1.5">
                                                                 <Mail className="w-3 h-3" />
                                                                 {cust.email}
                                                             </span>
                                                         )}
                                                         {cust.phone && (
-                                                            <span className="flex items-center gap-1">
+                                                            <span className="flex items-center gap-1.5">
                                                                 <Phone className="w-3 h-3" />
                                                                 {cust.phone}
                                                             </span>
                                                         )}
+                                                        {!cust.email && !cust.phone && <span className="opacity-50">-</span>}
                                                     </div>
-                                                </div>
-                                            </div>
-                                            <div className="flex items-center gap-6 text-right">
-                                                <div>
-                                                    <div className="text-xs text-muted-foreground">10mm</div>
-                                                    <div className="font-mono font-semibold">{(cust.total10mm || 0).toLocaleString()}</div>
-                                                </div>
-                                                <div>
-                                                    <div className="text-xs text-muted-foreground">20mm</div>
-                                                    <div className="font-mono font-semibold">{(cust.total20mm || 0).toLocaleString()}</div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
+                                                </TableCell>
+                                                <TableCell className="text-right font-mono">
+                                                    {(cust.total10mm || 0).toLocaleString()}
+                                                </TableCell>
+                                                <TableCell className="text-right font-mono">
+                                                    {(cust.total20mm || 0).toLocaleString()}
+                                                </TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
                             )}
                         </CardContent>
                     </Card>

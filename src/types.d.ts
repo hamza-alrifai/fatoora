@@ -3,6 +3,8 @@ export interface FileAnalysis {
     success: boolean;
     fileName?: string;
     filePath?: string;
+    sheets?: string[]; // List of all sheets
+    selectedSheet?: string; // The sheet that was analyzed
     headers?: Array<{ index: number; name: string }>;
     rowCount?: number;
     dataRowCount?: number;
@@ -12,6 +14,10 @@ export interface FileAnalysis {
         index: number;
         name: string;
         confidence: 'high' | 'medium' | 'low';
+        reasoning?: string;
+        sampleValues?: any[];
+        qualityScore?: number;
+        issues?: string[];
     } | null;
     resultColumn?: {
         index: number;
@@ -22,6 +28,10 @@ export interface FileAnalysis {
     suggestedMatchLabel?: string;
     preview?: any[][];
     error?: string;
+    analysisReport?: {
+        qualityScore: number;
+        issues: { type: 'warning' | 'error', message: string }[];
+    };
 }
 
 // Invoicing Types
@@ -107,9 +117,9 @@ export interface Product {
 
 export interface ElectronAPI {
     // Legacy Excel & File System
-    readExcelHeaders: (filePath: string) => Promise<{ success: boolean; headers?: string[]; error?: string }>;
+    readExcelHeaders: (filePath: string, sheetName?: string) => Promise<{ success: boolean; headers?: string[]; error?: string }>;
 
-    readExcelPreview: (filePath: string) => Promise<{
+    readExcelPreview: (filePath: string, sheetName?: string) => Promise<{
         success: boolean;
         data?: any[][];
         rowCount?: number;
@@ -120,7 +130,7 @@ export interface ElectronAPI {
         error?: string;
     }>;
 
-    analyzeExcelFile: (filePath: string) => Promise<FileAnalysis>;
+    analyzeExcelFile: (filePath: string, sheetName?: string) => Promise<FileAnalysis>;
 
     processExcelFiles: (options: {
         masterPath: string;
@@ -134,6 +144,8 @@ export interface ElectronAPI {
         outputPath?: string;
         masterRowRange?: { start: number; end: number };
         targetRowRanges?: Record<string, { start: number; end: number }>;
+        masterSheetName?: string;
+        targetSheetNames?: Record<string, string>;
     }) => Promise<{
         success: boolean;
         results?: any[];
@@ -169,6 +181,7 @@ export interface ElectronAPI {
     showInFolder: (filePath: string) => Promise<void>;
     saveFileDialog: (defaultPath: string) => Promise<{ canceled: boolean; filePath?: string }>;
     openFileDialog: (options: { multiple?: boolean; filters?: any[] }) => Promise<{ canceled: boolean; filePaths: string[] }>;
+    openDirectoryDialog: () => Promise<{ canceled: boolean; filePaths: string[] }>;
 
     // Invoicing
     saveInvoice: (invoice: Invoice) => Promise<{ success: boolean; id?: string; error?: string }>;

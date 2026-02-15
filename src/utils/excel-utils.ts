@@ -1,3 +1,5 @@
+import { COLUMN_KEYWORDS, FOOTER_KEYWORDS } from '@/constants';
+
 /**
  * Excel parsing utilities
  * Extracted from main.ts for testability
@@ -7,10 +9,10 @@
  * Common header patterns for column detection
  */
 export const COLUMN_PATTERNS = {
-    id: ['ticket', 'ticket #', 'ticket#', 'id', 'no', 'number', 'ref', 'reference', 'serial', 'sl', 'sl.', 's.no', 'code'],
-    description: ['description', 'desc', 'item', 'material', 'product', 'name', 'details', 'particulars', 'narration'],
-    quantity: ['qty', 'quantity', 'qnty', 'ton', 'tons', 'weight', 'units', 'pcs', 'amount', 'net', 'gross'],
-    date: ['date', 'dated', 'dt', 'delivery date', 'trip date', 'invoice date'],
+    id: COLUMN_KEYWORDS.ID,
+    description: COLUMN_KEYWORDS.DESCRIPTION,
+    quantity: COLUMN_KEYWORDS.QUANTITY,
+    date: COLUMN_KEYWORDS.DATE,
 } as const;
 
 /**
@@ -38,7 +40,12 @@ export function isValidId(value: any): boolean {
 
     // Skip if it looks like a header keyword
     const lower = str.toLowerCase();
-    const headerKeywords = ['ticket', 'id', 'number', 'ref', 'date', 'description', 'qty', 'total'];
+    const headerKeywords = [
+        ...COLUMN_KEYWORDS.ID,
+        ...COLUMN_KEYWORDS.DESCRIPTION,
+        ...COLUMN_KEYWORDS.QUANTITY,
+        ...['total']
+    ];
     if (headerKeywords.some(kw => lower === kw)) return false;
 
     // Accept alphanumeric values that aren't just headers
@@ -120,10 +127,8 @@ export function parseQuantity(value: any): number {
  * @returns True if row appears to be a total/footer
  */
 export function isFooterRow(row: any[]): boolean {
-    const footerKeywords = ['total', 'grand total', 'sub total', 'subtotal', 'sum', 'net total'];
-
     return row.some(cell => {
         const normalized = normalizeValue(cell);
-        return footerKeywords.some(kw => normalized.includes(kw));
+        return FOOTER_KEYWORDS.some(kw => normalized.includes(kw));
     });
 }

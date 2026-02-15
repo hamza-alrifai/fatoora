@@ -1,8 +1,12 @@
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowRight, Check, FileSpreadsheet, Files, Loader2, Download } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { ArrowRight, Check, FileSpreadsheet, Files, Loader2, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
+import type { ReconciliationResult } from '@/utils/reconciliation-engine';
+import { generateExecutiveSummaryExcel } from '@/utils/executive-summary-generator';
+import { toast } from 'sonner';
 
 interface FileStats {
     filePath: string;
@@ -15,170 +19,234 @@ interface FileStats {
 interface Stats {
     matchPercentage: number;
     unmatchedMasterRows: number;
+    totalMasterRows: number;
+    matchedMasterRows: number;
 }
 
 interface MatcherResultsViewProps {
     stats: Stats | null;
-    executiveSummary: any[] | null;
+
     perFileStats: FileStats[] | null;
     targetConfigs: any[];
     isGeneratingInvoices: boolean;
     handlePrepareGeneration: () => void;
     handleOpenUnmatched: () => void;
+    reconciliationResult: ReconciliationResult;
 }
 
 export default function MatcherResultsView({
     stats,
-    executiveSummary,
     perFileStats,
     targetConfigs,
     isGeneratingInvoices,
     handlePrepareGeneration,
-    handleOpenUnmatched
+    handleOpenUnmatched,
+    reconciliationResult
 }: MatcherResultsViewProps) {
-    // Calculate total rows processed
-    const totalRows = perFileStats?.reduce((sum, file) => sum + file.total, 0) || 0;
-    
+
     return (
-        <div className="max-w-3xl mx-auto space-y-5 animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-indigo-600 to-indigo-700 text-white shadow-xl">
-                <div className="absolute top-0 right-0 p-8 opacity-10">
-                    <Check className="w-40 h-40" />
-                </div>
-                <div className="relative z-10 p-5 md:p-6">
-                    <div className="flex flex-col md:flex-row justify-between gap-4 items-start md:items-center">
-                        <div className="flex-1">
-                            <div className="flex items-center gap-3 mb-2">
-                                <div className="p-1.5 bg-white/20 rounded-full backdrop-blur-sm">
-                                    <Check className="w-4 h-4 text-white" />
-                                </div>
-                                <h1 className="text-xl font-bold text-white">
-                                    Reconciliation Complete
-                                </h1>
-                            </div>
-                            <p className="text-indigo-200 text-sm">
-                                Successfully processed {totalRows.toLocaleString()} rows • {stats?.unmatchedMasterRows || 0} unmatched items
-                            </p>
-                        </div>
+        <div className="max-w-5xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-10">
 
-                        {stats && executiveSummary && (
-                            <div className="flex gap-4 bg-white/10 p-4 rounded-xl backdrop-blur-sm border border-white/10">
-                                <div className="space-y-1">
-                                    <p className="text-xs text-indigo-200 uppercase font-bold tracking-wider">Match Rate</p>
-                                    <p className="text-2xl font-bold font-mono">
-                                        {stats.matchPercentage}%
-                                    </p>
-                                </div>
-                            </div>
-                        )}
+            {/* Header Section with Stats */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {/* Main Status Card */}
+                <Card className="md:col-span-3 bg-gradient-to-br from-indigo-600 to-indigo-700 text-white border-none shadow-xl overflow-hidden relative">
+                    <div className="absolute top-0 right-0 p-8 opacity-10">
+                        <CheckCircle2 className="w-64 h-64 -mr-16 -mt-16" />
                     </div>
-                </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <Card className="col-span-1 md:col-span-2 border-primary/20 bg-gradient-to-br from-primary/5 to-transparent hover:border-primary/50 transition-all cursor-pointer group relative overflow-hidden">
-                    <div className="absolute inset-0 bg-primary/5 translate-y-full group-hover:translate-y-0 transition-transform duration-300" />
-                    <CardContent className="p-5 relative z-10 flex flex-col items-center text-center h-full">
-                        <div className="p-3 bg-primary/10 text-primary rounded-xl mb-4 group-hover:scale-110 transition-transform shadow-sm">
-                            <Files className="w-7 h-7" />
-                        </div>
-                        <h3 className="text-xl font-bold mb-2">What's Next?</h3>
-                        <div className="space-y-3 mb-5 max-w-lg">
-                            <div className="flex items-center gap-3 text-muted-foreground">
-                                <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center">
-                                    <span className="text-primary font-bold text-xs">1</span>
-                                </div>
-                                <span className="text-sm">Generate <strong>Invoices</strong> for matched items</span>
-                            </div>
-                            {stats?.unmatchedMasterRows && stats.unmatchedMasterRows > 0 && (
-                                <div className="flex items-center gap-3 text-amber-600">
-                                    <div className="w-6 h-6 rounded-full bg-amber-100 flex items-center justify-center">
-                                        <span className="text-amber-600 font-bold text-xs">!</span>
+                    <CardContent className="p-8 relative z-10">
+                        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+                            <div>
+                                <div className="flex items-center gap-3 mb-2">
+                                    <div className="p-2 bg-white/20 rounded-full backdrop-blur-sm">
+                                        <Check className="w-5 h-5 text-white" />
                                     </div>
-                                    <span className="text-sm">Review <strong>{stats.unmatchedMasterRows} unmatched</strong> items</span>
+                                    <h1 className="text-2xl font-bold">Reconciliation Complete</h1>
                                 </div>
-                            )}
-                        </div>
-                        <div className="flex gap-4 items-center justify-center flex-wrap">
-                            <Button
-                                className="max-w-sm font-bold shadow-lg shadow-primary/20 px-6"
-                                onClick={handlePrepareGeneration}
-                                disabled={isGeneratingInvoices}
-                            >
-                                {isGeneratingInvoices ? (
-                                    <>
-                                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                                        Generating...
-                                    </>
-                                ) : (
-                                    <>
-                                        Generate Invoices <ArrowRight className="ml-2 w-4 h-4" />
-                                    </>
-                                )}
-                            </Button>
-                            {stats?.unmatchedMasterRows && stats.unmatchedMasterRows > 0 && (
-                                <Button
-                                    className="max-w-sm bg-amber-500 hover:bg-amber-600 text-white font-bold shadow-lg shadow-amber-500/20 px-6 transition-all duration-200"
-                                    onClick={handleOpenUnmatched}
-                                    disabled={isGeneratingInvoices}
-                                >
-                                    <Download className="w-4 h-4 mr-2" />
-                                    Review Unmatched
-                                </Button>
+                                <p className="text-indigo-100 max-w-xl">
+                                    Successfully processed and reconciled your data. You can now generate invoices or download reports.
+                                </p>
+                            </div>
+
+                            {stats && (
+                                <div className="flex gap-6">
+                                    <div className="bg-white/10 rounded-xl p-4 backdrop-blur-sm min-w-[120px]">
+                                        <p className="text-xs text-indigo-200 font-medium uppercase tracking-wider mb-1">Match Rate</p>
+                                        <div className="flex items-baseline gap-1">
+                                            <span className="text-3xl font-bold">{stats.matchPercentage}%</span>
+                                        </div>
+                                    </div>
+                                    <div className="bg-white/10 rounded-xl p-4 backdrop-blur-sm min-w-[120px]">
+                                        <p className="text-xs text-indigo-200 font-medium uppercase tracking-wider mb-1">Unmatched</p>
+                                        <div className="flex items-baseline gap-1">
+                                            <span className="text-3xl font-bold">{stats.unmatchedMasterRows}</span>
+                                            <span className="text-sm text-indigo-200">items</span>
+                                        </div>
+                                    </div>
+                                </div>
                             )}
                         </div>
                     </CardContent>
                 </Card>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {perFileStats && perFileStats.length > 0 && (
-                    <Card className="md:col-span-3 bg-card/50">
-                        <CardHeader className="pb-3">
-                            <CardTitle className="text-lg flex items-center gap-2">
-                                <FileSpreadsheet className="w-5 h-5 text-muted-foreground" />
-                                File Performance
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {/* Main Actions Section */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <Card className="border-2 border-primary/10 hover:border-primary/30 transition-all shadow-md hover:shadow-lg group">
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-3 text-primary">
+                            <div className="p-2.5 bg-primary/10 rounded-lg group-hover:scale-110 transition-transform">
+                                <Files className="w-6 h-6" />
+                            </div>
+                            Generate Invoices
+                        </CardTitle>
+                        <CardDescription>
+                            Create individual invoices for each matched customer based on the reconciled data.
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <Button
+                            className="w-full text-lg h-12 font-semibold shadow-lg shadow-primary/20"
+                            onClick={handlePrepareGeneration}
+                            disabled={isGeneratingInvoices}
+                        >
+                            {isGeneratingInvoices ? (
+                                <>
+                                    <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                                    Generating...
+                                </>
+                            ) : (
+                                <>
+                                    Generate Invoices <ArrowRight className="ml-2 w-5 h-5" />
+                                </>
+                            )}
+                        </Button>
+                    </CardContent>
+                </Card>
+
+                <Card className="border-2 border-indigo-100 hover:border-indigo-300 transition-all shadow-md hover:shadow-lg group bg-indigo-50/30">
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-3 text-indigo-700">
+                            <div className="p-2.5 bg-indigo-100 rounded-lg group-hover:scale-110 transition-transform">
+                                <FileSpreadsheet className="w-6 h-6 text-indigo-600" />
+                            </div>
+                            Executive Summary
+                        </CardTitle>
+                        <CardDescription>
+                            Download a comprehensive Excel report summarizing all matched groups and totals.
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <Button
+                            variant="outline"
+                            className="w-full text-lg h-12 font-semibold border-indigo-200 text-indigo-700 hover:bg-indigo-100"
+                            onClick={async () => {
+                                try {
+                                    await generateExecutiveSummaryExcel(reconciliationResult);
+                                    toast.success("Executive Summary downloaded!");
+                                } catch (e) {
+                                    console.error(e);
+                                    toast.error("Failed to download summary.");
+                                }
+                            }}
+                        >
+                            Download Report <ArrowRight className="ml-2 w-5 h-5" />
+                        </Button>
+                    </CardContent>
+                </Card>
+            </div>
+
+            {/* Secondary Actions & Details */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+                {/* File Performance List */}
+                <Card className="lg:col-span-2 shadow-sm">
+                    <CardHeader className="pb-3">
+                        <CardTitle className="text-lg flex items-center gap-2">
+                            <FileSpreadsheet className="w-5 h-5 text-muted-foreground" />
+                            File Performance
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent className="grid gap-4">
+                        {perFileStats && perFileStats.length > 0 ? (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 {perFileStats.map((file, idx) => {
                                     const config = targetConfigs.find(t => t.filePath === file.filePath);
                                     const displayName = config?.matchLabel || file.fileName;
 
                                     return (
-                                        <div key={idx} className="bg-background border rounded-lg p-3 space-y-2">
-                                            <div className="flex justify-between items-start">
-                                                <div className="space-y-0.5 max-w-[70%]">
-                                                    <div className="font-medium text-sm truncate" title={file.fileName}>
-                                                        {displayName}
-                                                    </div>
-                                                    <div className="text-xs text-muted-foreground">
-                                                        {file.matched.toLocaleString()} / {file.total.toLocaleString()} rows
-                                                    </div>
+                                        <div key={idx} className="bg-muted/30 border rounded-xl p-4 transition-all hover:bg-muted/50">
+                                            <div className="flex justify-between items-start mb-2">
+                                                <div className="font-semibold truncate pr-2 text-sm" title={file.fileName}>
+                                                    {displayName}
                                                 </div>
-                                                <Badge variant={file.percentage >= 90 ? 'success' : file.percentage >= 70 ? 'warning' : 'destructive'} className="ml-2">
+                                                <Badge variant={file.percentage >= 90 ? 'success' : file.percentage >= 70 ? 'warning' : 'destructive'} className="shrink-0">
                                                     {file.percentage}%
                                                 </Badge>
                                             </div>
-                                            <div className="h-1.5 w-full bg-secondary rounded-full overflow-hidden">
-                                                <div
-                                                    className={cn("h-full rounded-full",
-                                                        file.percentage >= 90 ? "bg-success" :
-                                                            file.percentage >= 70 ? "bg-warning" : "bg-destructive"
+                                            <div className="space-y-1.5">
+                                                <div className="flex justify-between text-xs text-muted-foreground">
+                                                    <span>Matched</span>
+                                                    <span>{file.matched} / {file.total}</span>
+                                                </div>
+                                                <Progress
+                                                    value={file.percentage}
+                                                    className={cn("h-2",
+                                                        file.percentage >= 90 ? "bg-green-100 [&>div]:bg-green-500" :
+                                                            file.percentage >= 70 ? "bg-amber-100 [&>div]:bg-amber-500" : "bg-red-100 [&>div]:bg-red-500"
                                                     )}
-                                                    style={{ width: `${file.percentage}%` }}
                                                 />
                                             </div>
                                         </div>
                                     );
                                 })}
                             </div>
+                        ) : (
+                            <div className="text-center py-8 text-muted-foreground bg-muted/20 rounded-xl border border-dashed">
+                                No file stats available.
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
+
+                {/* Unmatched Items Action */}
+                {stats?.unmatchedMasterRows && stats.unmatchedMasterRows > 0 ? (
+                    <Card className="shadow-sm border-amber-200 bg-amber-50/50">
+                        <CardHeader className="pb-3">
+                            <CardTitle className="text-lg flex items-center gap-2 text-amber-700">
+                                <AlertTriangle className="w-5 h-5" />
+                                Unmatched Items
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="space-y-4">
+                                <p className="text-sm text-amber-800/80">
+                                    There are <strong>{stats.unmatchedMasterRows}</strong> items in the master file that didn't match any customer records.
+                                </p>
+                                <Button
+                                    variant="outline"
+                                    className="w-full border-amber-300 text-amber-800 hover:bg-amber-100 hover:text-amber-900 bg-white"
+                                    onClick={handleOpenUnmatched}
+                                >
+                                    Review Unmatched Items
+                                </Button>
+                            </div>
+                        </CardContent>
+                    </Card>
+                ) : (
+                    <Card className="shadow-sm bg-green-50/50 border-green-200">
+                        <CardContent className="pt-6 flex flex-col items-center justify-center text-center h-full min-h-[160px]">
+                            <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mb-3 text-green-600">
+                                <CheckCircle2 className="w-6 h-6" />
+                            </div>
+                            <h3 className="font-semibold text-green-900">All Items Matched</h3>
+                            <p className="text-sm text-green-700/80 mt-1">
+                                Great job! Every item in the master file has been successfully matched.
+                            </p>
                         </CardContent>
                     </Card>
                 )}
-
-                            </div>
+            </div>
         </div>
     );
 }

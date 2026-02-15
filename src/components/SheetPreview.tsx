@@ -14,6 +14,9 @@ interface SheetPreviewProps {
     onRowRangeSelect?: (range: { start: number; end: number } | null) => void;
     allowNewColumn?: boolean;
     selectionMode?: 'single' | 'range';
+    sheets?: string[];  // List of all sheets in the file
+    selectedSheet?: string;  // Currently selected sheet
+    onSheetChange?: (sheetName: string) => void;  // Callback when sheet changes
 }
 
 export function SheetPreview({
@@ -24,7 +27,10 @@ export function SheetPreview({
     selectedRowRange,
     onRowRangeSelect,
     allowNewColumn = false,
-    selectionMode = 'range'
+    selectionMode = 'range',
+    sheets = [],
+    selectedSheet,
+    onSheetChange
 }: SheetPreviewProps) {
     const [data, setData] = useState<any[][]>([]);
     const [rowCount, setRowCount] = useState(0);
@@ -47,7 +53,7 @@ export function SheetPreview({
             setLoading(true);
             setError(null);
             try {
-                const res = await window.electron.readExcelPreview(filePath);
+                const res = await window.electron.readExcelPreview(filePath, selectedSheet);
                 if (res.success && res.data) {
                     setData(res.data);
                     setRowCount(res.rowCount || res.data.length);
@@ -74,7 +80,7 @@ export function SheetPreview({
         };
 
         loadData();
-    }, [filePath, selectedCols, selectedRowRange, onColumnSelect, onRowRangeSelect]);
+    }, [filePath, selectedSheet, selectedCols, selectedRowRange, onColumnSelect, onRowRangeSelect]);
 
     const maxCols = data.length > 0 ? Math.max(...data.map(r => r.length)) : 0;
     const displayCols = allowNewColumn ? maxCols + 1 : maxCols;
@@ -173,6 +179,27 @@ export function SheetPreview({
 
     return (
         <div className="flex flex-col h-full">
+            {/* Sheet Tabs - Only show if multiple sheets */}
+            {sheets && sheets.length > 1 && (
+                <div className="flex items-center gap-1 px-4 py-2 border-b border-border bg-muted/30 overflow-x-auto">
+                    <span className="text-xs font-semibold text-muted-foreground mr-2 shrink-0">Sheets:</span>
+                    {sheets.map(sheetName => (
+                        <Button
+                            key={sheetName}
+                            variant={selectedSheet === sheetName ? "default" : "ghost"}
+                            size="sm"
+                            onClick={() => onSheetChange?.(sheetName)}
+                            className={cn(
+                                "h-7 text-xs shrink-0 transition-all",
+                                selectedSheet === sheetName && "shadow-md"
+                            )}
+                        >
+                            {sheetName}
+                        </Button>
+                    ))}
+                </div>
+            )}
+
             {/* Header */}
             <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-card/50">
                 <div className="flex items-center gap-2">

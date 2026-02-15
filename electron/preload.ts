@@ -4,6 +4,8 @@ contextBridge.exposeInMainWorld('electron', {
     openFileDialog: (options: { multiple?: boolean, filters?: any[] }) =>
         ipcRenderer.invoke('dialog:openFile', options),
 
+    openDirectoryDialog: () => ipcRenderer.invoke('dialog:openDirectory'),
+
     readExcelHeaders: (filePath: string) =>
         ipcRenderer.invoke('excel:readHeaders', filePath),
 
@@ -13,8 +15,21 @@ contextBridge.exposeInMainWorld('electron', {
     analyzeExcelFile: (filePath: string) =>
         ipcRenderer.invoke('excel:analyze', filePath),
 
-    processExcelFiles: (options: any) =>
-        ipcRenderer.invoke('excel:process', options),
+    processExcelFiles: (options: {
+        masterPath: string;
+        targetPaths: string[];
+        masterColIndices: number[];
+        masterResultColIndex: number;
+        targetMatchColIndices: Record<string, number[]>;
+        targetMatchStrings: Record<string, string>;
+        matchSentence: string;
+        noMatchSentence: string;
+        outputPath?: string;
+        masterRowRange?: { start: number; end: number };
+        targetRowRanges?: Record<string, { start: number; end: number }>;
+        masterSheetName?: string;
+        targetSheetNames?: Record<string, string>;
+    }) => ipcRenderer.invoke('excel:process', options),
 
     openFile: (filePath: string) => ipcRenderer.invoke('app:openFile', filePath),
     showInFolder: (filePath: string) => ipcRenderer.invoke('app:showInFolder', filePath),
@@ -55,7 +70,7 @@ contextBridge.exposeInMainWorld('electron', {
     onInvoiceData: (callback: (event: any, data: any) => void) => ipcRenderer.on('print-data', callback),
     sendPrintReady: () => ipcRenderer.send('print-ready'),
     sendPrintWindowReady: () => ipcRenderer.send('print-window-ready'),
-    
+
     // Event listeners for background services
     on: (channel: string, callback: (...args: any[]) => void) => {
         ipcRenderer.on(channel, callback);
