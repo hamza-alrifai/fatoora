@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react';
 import { toast } from 'sonner';
-import type { Customer } from '../../types.d';
+import type { Customer } from "../../types";
 import type { FileGenConfig } from '@/hooks/useMatcherState';
 import type { ReconciliationResult } from '@/utils/reconciliation-engine';
 

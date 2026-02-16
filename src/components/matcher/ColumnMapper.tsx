@@ -1,4 +1,4 @@
-import type { Customer } from '../../types.d';
+import type { Customer } from "../../types";
 import { useState, useEffect } from 'react';
 import { GlassDialog } from '@/components/ui/glass-dialog';
 import { Button } from '@/components/ui/button';

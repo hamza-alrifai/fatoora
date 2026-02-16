@@ -4,7 +4,7 @@
  */
 
 import { useState, useEffect } from 'react';
-import type { FileAnalysis } from '../types.d';
+import type { FileAnalysis } from "../types";
 
 
 interface FileConfig extends FileAnalysis {

@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { toast } from 'sonner';
-import type { FileAnalysis } from '../../types.d';
+import type { FileAnalysis } from "../../types";
 
 export interface FileConfig extends FileAnalysis {
     matchLabel?: string;
@@ -9,9 +9,19 @@ export interface FileConfig extends FileAnalysis {
     // Add other fields as needed
 }
 
-export function useFileSelection() {
-    const [masterConfig, setMasterConfig] = useState<FileConfig | null>(null);
-    const [targetConfigs, setTargetConfigs] = useState<FileConfig[]>([]);
+export interface UseFileSelectionProps {
+    masterConfig: FileConfig | null;
+    setMasterConfig: React.Dispatch<React.SetStateAction<FileConfig | null>>;
+    targetConfigs: FileConfig[];
+    setTargetConfigs: React.Dispatch<React.SetStateAction<FileConfig[]>>;
+}
+
+export function useFileSelection({
+    masterConfig,
+    setMasterConfig,
+    targetConfigs,
+    setTargetConfigs
+}: UseFileSelectionProps) {
     const [isAnalyzing, setIsAnalyzing] = useState(false);
 
     // Mapping mapper state
@@ -19,66 +29,93 @@ export function useFileSelection() {
     const [mappingTarget, setMappingTarget] = useState<{ type: 'master' | 'target'; index: number } | null>(null);
 
     const analyzeFile = useCallback(async (filePath: string): Promise<FileConfig | null> => {
-        const result = await window.electron.analyzeExcelFile(filePath);
-        if (!result.success) {
-            toast.error(`Failed to analyze: ${result.error}`);
+        console.log(`Analyzing file: ${filePath}`);
+        try {
+            const result = await window.electron.analyzeExcelFile(filePath);
+            console.log(`Analysis result for ${filePath}:`, result);
+
+            if (!result.success) {
+                console.error(`Analysis failed for ${filePath}:`, result.error);
+                toast.error(`Failed to analyze: ${result.error}`);
+                return null;
+            }
+
+            const previewRes = await window.electron.readExcelPreview(filePath);
+            console.log(`Preview result for ${filePath}:`, previewRes);
+
+            return {
+                ...result,
+                ...result, // Intentionally spreading twice? (from original code)
+                matchLabel: undefined,
+                preview: previewRes.success ? previewRes.data : undefined,
+                // Initialize overrides
+                overrideIdColumn: undefined,
+                overrideResultColumn: undefined,
+            } as FileConfig;
+        } catch (error) {
+            console.error(`Exception during analysis of ${filePath}:`, error);
+            toast.error(`Error analyzing file: ${filePath}`);
             return null;
         }
-
-        const previewRes = await window.electron.readExcelPreview(filePath);
-
-        return {
-            ...result,
-            ...result, // Intentionally spreading twice? (from original code)
-            matchLabel: undefined,
-            preview: previewRes.success ? previewRes.data : undefined,
-            // Initialize overrides
-            overrideIdColumn: undefined,
-            overrideResultColumn: undefined,
-        } as FileConfig;
     }, []);
 
     const handleSelectMaster = useCallback(async () => {
-        const res = await window.electron.openFileDialog({
-            multiple: false,
-            filters: [{ name: 'Excel', extensions: ['xlsx', 'xls'] }],
-        });
-        if (!res.canceled && res.filePaths.length > 0) {
-            setIsAnalyzing(true);
-            const config = await analyzeFile(res.filePaths[0]);
-            setMasterConfig(config);
-            setIsAnalyzing(false);
+        console.log("Opening master file dialog...");
+        try {
+            const res = await window.electron.openFileDialog({
+                multiple: false,
+                filters: [{ name: 'Excel', extensions: ['xlsx', 'xls'] }],
+            });
+            console.log("Master file dialog result:", res);
 
-            if (config) {
-                setMappingTarget({ type: 'master', index: 0 });
-                setMapperOpen(true);
+            if (!res.canceled && res.filePaths.length > 0) {
+                setIsAnalyzing(true);
+                const config = await analyzeFile(res.filePaths[0]);
+                if (config) {
+                    console.log("Master config created:", config);
+                    setMasterConfig(config);
+                    setMappingTarget({ type: 'master', index: 0 });
+                    setMapperOpen(true);
+                } else {
+                    console.warn("Failed to create master config");
+                }
+                setIsAnalyzing(false);
             }
+        } catch (error) {
+            console.error("Error selecting master file:", error);
         }
     }, [analyzeFile]);
 
     const handleSelectTargets = useCallback(async () => {
-        const res = await window.electron.openFileDialog({
-            multiple: true,
-            filters: [{ name: 'Excel', extensions: ['xlsx', 'xls'] }],
-        });
-        if (!res.canceled && res.filePaths.length > 0) {
-            setIsAnalyzing(true);
-            const configs: FileConfig[] = [];
-            for (const filePath of res.filePaths) {
-                // Ensure duplicate files aren't added? Logic not present in original, kept simple
-                const config = await analyzeFile(filePath);
-                if (config) configs.push(config);
-            }
+        console.log("Opening target file dialog...");
+        try {
+            const res = await window.electron.openFileDialog({
+                multiple: true,
+                filters: [{ name: 'Excel', extensions: ['xlsx', 'xls'] }],
+            });
+            console.log("Target file dialog result:", res);
 
-            const startIndex = targetConfigs.length;
-            setTargetConfigs(prev => [...prev, ...configs]); // Append new files
-            setIsAnalyzing(false);
+            if (!res.canceled && res.filePaths.length > 0) {
+                setIsAnalyzing(true);
+                const configs: FileConfig[] = [];
+                for (const filePath of res.filePaths) {
+                    // Ensure duplicate files aren't added? Logic not present in original, kept simple
+                    const config = await analyzeFile(filePath);
+                    if (config) configs.push(config);
+                }
 
-            if (configs.length > 0) {
-                // Trigger mapping for first new file
-                setMappingTarget({ type: 'target', index: startIndex });
-                setMapperOpen(true);
+                const startIndex = targetConfigs.length;
+                setTargetConfigs(prev => [...prev, ...configs]); // Append new files
+                setIsAnalyzing(false);
+
+                if (configs.length > 0) {
+                    // Trigger mapping for first new file
+                    setMappingTarget({ type: 'target', index: startIndex });
+                    setMapperOpen(true);
+                }
             }
+        } catch (error) {
+            console.error("Error selecting target files:", error);
         }
     }, [analyzeFile, targetConfigs.length]); // Dependencies
 
@@ -148,7 +185,7 @@ export function useFileSelection() {
         masterConfig?.overrideIdColumn !== undefined &&
         masterConfig?.overrideIdColumn !== -1 &&
         masterConfig?.overrideResultColumn !== undefined &&
-        masterConfig?.overrideResultColumn !== -1 &&
+        // masterConfig?.overrideResultColumn !== -1 && // Allow -1 for "Create New Column"
         targetConfigs.length > 0 &&
         targetConfigs.every(t => t.overrideIdColumn !== undefined && t.overrideIdColumn !== -1 && !!t.matchLabel);
 

@@ -1,9 +1,9 @@
-import React from 'react';
+
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Trash2, Database, Eye, Sparkles } from 'lucide-react';
-import type { FileAnalysis, Customer } from '../../../types.d';
+import type { FileAnalysis, Customer } from "@/types";
 import { CustomSelect } from '../ui/custom-native-select';
 
 interface FileConfig extends FileAnalysis {
@@ -117,10 +117,11 @@ export const FileConfigurationCard = ({
                                         if (onResultColumnChange) onResultColumnChange(isNaN(intVal) ? undefined : intVal);
                                     }}
                                     options={[
+                                        // { value: undefined, label: '-- Select --' }, // CustomSelect handles placeholder if value is undefined
                                         { value: -1, label: `✨ Create New Column` },
                                         ...(config.headers?.map(h => ({ value: h.index, label: h.name })) || [])
                                     ]}
-                                    placeholder="Select output..."
+                                    placeholder="-- Select --"
                                     className="h-8 text-xs border-indigo-200 focus:border-indigo-500"
                                 />
                             </div>

@@ -5,7 +5,7 @@ import {
     calculateMatchStats,
     isValidDataRow,
 } from '../matcher-utils';
-import { detectProductType } from '../product-type-utils';
+import { detectProductType } from '../product-utils';
 
 describe('guessColumns', () => {
     it('finds material description column', () => {

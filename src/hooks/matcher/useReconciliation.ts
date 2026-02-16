@@ -1,5 +1,5 @@
 import { useMemo, useEffect, useState } from 'react';
-import type { Customer } from '../../types.d';
+import type { Customer } from "../../types";
 import type { FileGenConfig } from '@/hooks/useMatcherState';
 import { calculateReconciliationStats } from '@/utils/reconciliation-engine';
 

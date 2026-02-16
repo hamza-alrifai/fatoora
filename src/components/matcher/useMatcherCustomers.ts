@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
-import type { Customer } from '../../types.d';
+import type { Customer } from "../../types";
 import type { CustomerData } from '@/components/customers/CustomerCreationDialog';
 import type { FileGenConfig } from '@/hooks/useMatcherState';
 

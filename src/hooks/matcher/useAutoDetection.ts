@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import type { Customer } from '../../types.d';
+import type { Customer } from "../../types";
 import type { FileConfig } from './useFileSelection'; // Assuming FileConfig is exported or shared
 import { detectColumns } from '@/utils/column-detection';
 import { guessCustomer } from '@/utils/customer-matching';
@@ -34,7 +34,7 @@ export function useAutoDetection(params: {
                 return {
                     ...prev,
                     overrideIdColumn: prev.overrideIdColumn ?? suggestedIdIndex,
-                    overrideResultColumn: prev.overrideResultColumn ?? -1
+                    // overrideResultColumn: prev.overrideResultColumn ?? -1 // Don't auto-select "Create New Column" per user request
                 };
             });
         }

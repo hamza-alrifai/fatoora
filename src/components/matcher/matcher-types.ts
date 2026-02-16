@@ -1,4 +1,4 @@
-import type { FileAnalysis } from '../../types.d';
+import type { FileAnalysis } from "../../types";
 
 export interface MatcherFileConfig extends FileAnalysis {
     matchLabel?: string;

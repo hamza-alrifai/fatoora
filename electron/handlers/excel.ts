@@ -159,6 +159,7 @@ export function registerExcelHandlers() {
         return await analyzeExcelFile(filePath, sheetName);
     });
 
+
     // Read Preview (All rows)
     ipcMain.handle('excel:readPreview', async (_, filePath, sheetName?: string) => {
         try {
@@ -168,34 +169,9 @@ export function registerExcelHandlers() {
             // Read as array of arrays - ALL ROWS
             const data = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as any[][];
 
-            // Auto-detect header row
-            // Note: findHeaderRow is not exported from excel-processor, but from excel-utils
-            // We need to import it if we use it here.
-            // But wait, findHeaderRow was imported from ../utils/excel-utils in the original file.
-            // I should ensure I imported it. Yes I did in the imports above?
-            // Wait, I replaced lines 1-605, so I need to check my new imports.
-            // I removed findHeaderRow from imports in the replacement content I prepared?
-            // No, I only imported getSheet. I should import findHeaderRow and findFooterStartRow if used here.
-            // Let's re-read the code I'm replacing.
-
-            // logic below uses FindHeaderRow, FindFooterStartRow.
-            // I should import them.
-            // OR I should move readPreview to service too? 
-            // readPreview is simple enough to stay or move.
-            // Let's keep it here but fix imports.
-
-            // Wait, looking at my ReplacementContent... I forgot to import findHeaderRow etc.
-            // I will fix the imports in the ReplacementContent before submitting.
-
-            // ... (rest of logic) ...
-
-            // But actually, why not move readPreview to service? It's analysis logic.
-            // Let's assume I keep it here for now to minimize changes, but I need those utility imports.
-
-            // ...
-
             return {
-                // ...
+                success: true,
+                data
             };
         } catch (error: any) {
             return { success: false, error: error.message };

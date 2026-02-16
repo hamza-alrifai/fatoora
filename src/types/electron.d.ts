@@ -3,6 +3,14 @@
  * Replaces all 'any' types with proper interfaces
  */
 
+import type {
+    Customer,
+    Product,
+    Invoice,
+    InvoiceItem,
+    BankingDetails
+} from '../types';
+
 export interface FileDialogOptions {
     multiple?: boolean;
     filters?: Array<{ name: string; extensions: string[] }>;
@@ -78,18 +86,6 @@ export interface ProcessExcelResult {
     error?: string;
 }
 
-export interface Customer {
-    id: string;
-    name: string;
-    email?: string;
-    phone?: string;
-    address?: string;
-    total20mm?: number;
-    total10mm?: number;
-    createdAt: string;
-    updatedAt: string;
-}
-
 export interface CustomersResult {
     success: boolean;
     customers?: Customer[];
@@ -102,55 +98,10 @@ export interface SaveCustomerResult {
     error?: string;
 }
 
-export interface Product {
-    id: string;
-    name: string;
-    type: '10mm' | '20mm' | 'other';
-    rate: number;
-    description?: string;
-    createdAt: string;
-    updatedAt: string;
-}
-
 export interface ProductsResult {
     success: boolean;
     products?: Product[];
     error?: string;
-}
-
-export interface InvoiceItem {
-    id: string;
-    description: string;
-    quantity: number;
-    unitPrice: number;
-    amount: number;
-}
-
-export interface Invoice {
-    id: string;
-    number: string;
-    date: string;
-    status: 'draft' | 'issued' | 'paid' | 'overdue';
-    from: {
-        name: string;
-        address: string;
-        email: string;
-        phone: string;
-    };
-    to: {
-        customerId?: string;
-        name: string;
-        address: string;
-        email: string;
-        phone: string;
-    };
-    items: InvoiceItem[];
-    subtotal: number;
-    tax: number;
-    total: number;
-    currency: string;
-    createdAt: string;
-    updatedAt: string;
 }
 
 export interface InvoicesResult {
@@ -175,17 +126,6 @@ export interface DeleteResult {
 export interface GenerateInvoiceResult {
     success: boolean;
     error?: string;
-}
-
-export interface BankingDetails {
-    id: string;
-    name: string;
-    accountName: string;
-    accountNumber: string;
-    bankName: string;
-    iban?: string;
-    swiftCode?: string;
-    isDefault: boolean;
 }
 
 export interface BankingDetailsResult {
@@ -243,3 +183,4 @@ declare global {
         electron: ElectronAPI;
     }
 }
+

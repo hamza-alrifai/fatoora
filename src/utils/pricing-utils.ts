@@ -3,7 +3,7 @@
  * Consolidates split pricing and excess charge logic
  */
 
-import type { ProductType } from './product-type-utils';
+import type { ProductType } from './product-utils';
 
 export interface SplitPricingConfig {
     enabled: boolean;

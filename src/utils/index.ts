@@ -13,7 +13,7 @@ export * from './customer-utils';
 export * from './date-utils';
 
 // Excel utilities (excluding parseQuantity to avoid conflict)
-export { 
+export {
     COLUMN_PATTERNS,
     normalizeValue,
     isValidId,
@@ -32,7 +32,7 @@ export * from './matcher-utils';
 export * from './product-utils';
 
 // Product type utilities
-export * from './product-type-utils';
+
 
 // Pricing utilities
 export * from './pricing-utils';

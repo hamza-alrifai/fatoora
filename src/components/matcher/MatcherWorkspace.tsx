@@ -22,6 +22,8 @@ export function MatcherWorkspace({ currentStep, onStepChange }: MatcherWorkspace
     const controller = useMatcherController({ onStepChange });
 
     const {
+        masterConfig,
+        targetConfigs,
         state,
         ui,
         actions,
@@ -32,8 +34,6 @@ export function MatcherWorkspace({ currentStep, onStepChange }: MatcherWorkspace
 
     // Destructure state for easier access in render
     const {
-        masterConfig,
-        targetConfigs,
         noMatchLabel,
         stats,
         perFileStats,

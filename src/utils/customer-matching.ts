@@ -1,4 +1,4 @@
-import type { Customer } from '../types.d';
+import type { Customer } from "../types";
 
 // Helper: Levenshtein distance for fuzzy matching
 export const levenshtein = (a: string, b: string): number => {

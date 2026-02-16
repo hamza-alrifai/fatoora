@@ -1,6 +1,6 @@
 import type { Customer } from '@/types';
 import type { FileGenConfig } from '@/hooks/useMatcherState';
-import { detectProductType } from './product-type-utils';
+import { detectProductType } from './product-utils';
 import { parseQuantitySafe } from './quantity-parser';
 
 import type { ReconciliationResult } from './reconciliation-engine';

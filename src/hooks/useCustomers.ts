@@ -4,7 +4,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import type { Customer } from '../types.d';
+import type { Customer } from "../types";
 
 export function useCustomers() {
     const [customers, setCustomers] = useState<Customer[]>([]);

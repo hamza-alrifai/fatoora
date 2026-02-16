@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { toast } from 'sonner';
-import type { Customer } from '../../types.d';
+import type { Customer } from "../../types";
 import type { FileConfig } from '@/hooks/matcher/useFileSelection';
 import type { FileGenConfig } from '@/hooks/useMatcherState';
 

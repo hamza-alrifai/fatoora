@@ -5,7 +5,7 @@ import {
     Sparkles, Check, X, Loader2
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { Customer } from '../../types.d';
+import type { Customer } from "../../types";
 import type { FileGenConfig } from '@/hooks/useMatcherState';
 import { detectColumns } from '@/utils/column-detection';
 import type { ReconciliationResult } from '@/utils/reconciliation-engine';

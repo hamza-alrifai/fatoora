@@ -31,7 +31,12 @@ export function useMatcherController(params: {
 
     // --- Sub-hooks ---
     const customerMgmt = useCustomerManagement();
-    const fileSelection = useFileSelection();
+    const fileSelection = useFileSelection({
+        masterConfig: matcherState.masterConfig,
+        setMasterConfig: matcherState.setMasterConfig,
+        targetConfigs: matcherState.targetConfigs,
+        setTargetConfigs: matcherState.setTargetConfigs
+    });
     const processExec = useProcessExecution();
     const invoiceGen = useInvoiceGeneration();
 
@@ -150,7 +155,7 @@ export function useMatcherController(params: {
         reset();
         processExec.setUnmatchedPath(null);
         processExec.setMatchedRows([]);
-        onStepChange('configure');
+        onStepChange('upload');
     }, [reset, processExec, onStepChange]);
 
     // --- Return Combined Interface ---
@@ -178,6 +183,8 @@ export function useMatcherController(params: {
         },
         customers: customerMgmt.customers,
         summaryConfig,
+        masterConfig: fileSelection.masterConfig,
+        targetConfigs: fileSelection.targetConfigs,
         isReady: fileSelection.isReady,
         reconciliationResult,
         actions: {

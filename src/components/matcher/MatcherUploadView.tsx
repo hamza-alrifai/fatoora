@@ -2,7 +2,7 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Check, Files, Loader2, Upload, Plus, ArrowRight, FileSpreadsheet, X } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import type { FileAnalysis } from '../../types.d';
+import type { FileAnalysis } from "../../types";
 
 interface FileConfig extends FileAnalysis {
     matchLabel?: string;

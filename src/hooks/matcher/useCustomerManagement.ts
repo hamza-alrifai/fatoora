@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
 import { toast } from 'sonner';
-import type { Customer } from '../../types.d';
+import type { Customer } from "../../types";
 import type { CustomerData } from '@/components/customers/CustomerCreationDialog';
 
 export function useCustomerManagement() {
@@ -12,9 +12,15 @@ export function useCustomerManagement() {
 
     const loadCustomers = useCallback(async () => {
         try {
+            console.log("Loading customers...");
             const res = await window.electron.getCustomers();
+            console.log("getCustomers response:", res);
             if (res.success && res.customers) {
+                console.log("Setting customers:", res.customers.length);
                 setCustomers(res.customers);
+            } else {
+                console.error("Failed to load customers (success=false or no customers):", res);
+                toast.error(res.error || 'Failed to load customers');
             }
         } catch (error) {
             console.error("Failed to load customers:", error);
