@@ -27,7 +27,8 @@ export const COLUMN_KEYWORDS = {
     DESCRIPTION: [
         'description', 'desc', 'item', 'material', 'product', 'name', 'details',
         'particulars', 'narration', 'type', 'grade', 'commodity', 'size', 'gabbro',
-        'spec', 'specification'
+        'spec', 'specification', 'aggregate', 'material type', 'material description',
+        'mat type', 'mat desc', 'material group', 'product type', 'product name'
     ],
     QUANTITY: [
         'qty', 'quantity', 'qnty', 'ton', 'tons', 'weight', 'units', 'pcs', 'amount',

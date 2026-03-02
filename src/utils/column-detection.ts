@@ -60,7 +60,7 @@ export function detectColumns(headers: Header[]): ColumnDetectionResult {
         let bestScore = 0;
 
         headers.forEach(h => {
-            const score = scoreHeader(h.name, keywords);
+            const score = scoreHeader(h?.name || '', keywords);
             if (score > bestScore) {
                 bestScore = score;
                 bestIdx = h.index;

@@ -1,4 +1,4 @@
-import type { Customer } from "../types";
+import type { Customer } from '../types';
 
 // Helper: Levenshtein distance for fuzzy matching
 export const levenshtein = (a: string, b: string): number => {
@@ -24,35 +24,37 @@ export const levenshtein = (a: string, b: string): number => {
     return matrix[b.length][a.length];
 };
 
-// Helper: Guess customer from filename with fuzzy logic
-export const guessCustomer = (fileName: string, customers: Customer[]): string | undefined => {
-    if (!fileName || !customers.length) return undefined;
+// Helper: Guess customer from filename/groupname with fuzzy logic
+export const guessCustomer = (queryName: string, customers: Customer[]): string | undefined => {
+    if (!queryName || !customers.length) return undefined;
 
     // Normalize string: lowercase, replace separators with space, remove extra spaces
     const normalize = (str: string) => str.toLowerCase().replace(/[_\-.]/g, ' ').replace(/\s+/g, ' ').trim();
-    const normalizedFile = normalize(fileName);
+    const normalizedQuery = normalize(queryName);
 
     // 1. Exact/Substring Match (High Confidence)
     // Sort customers by length desc to match longest first (e.g. "Al Kaabi" before "Al")
     const sorted = [...customers].sort((a, b) => b.name.length - a.name.length);
 
     for (const customer of sorted) {
+        if (!customer.name) continue;
         const normalizedCustomer = normalize(customer.name);
-        if (normalizedFile.includes(normalizedCustomer)) {
+        if (normalizedQuery.includes(normalizedCustomer)) {
             return customer.name;
         }
     }
 
     // 2. Fuzzy Token Match (Medium Confidence)
-    // Split filename into tokens
-    const fileTokens = normalizedFile.split(' ').filter(t => t.length > 3); // Ignore short words
+    // Split query into tokens
+    const queryTokens = normalizedQuery.split(' ').filter(t => t.length > 3); // Ignore short words
 
     for (const customer of sorted) {
+        if (!customer.name) continue;
         const customerName = normalize(customer.name);
         // If customer name is short (<= 3 chars), skip fuzzy match to avoid false positives
         if (customerName.length <= 3) continue;
 
-        for (const token of fileTokens) {
+        for (const token of queryTokens) {
             // Check distance
             const distance = levenshtein(token, customerName);
             // Allow 1 edit for short words (4-5 chars), 2 edits for longer

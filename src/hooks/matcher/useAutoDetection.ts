@@ -61,11 +61,12 @@ export function useAutoDetection(params: {
                         }
                     }
 
-                    // 2. Auto-detect Customer from Filename
-                    if (!config.matchLabel && customers.length > 0) {
-                        const guessedCustomer = guessCustomer(config.fileName || '', customers);
-                        if (guessedCustomer) {
-                            updates.matchLabel = guessedCustomer;
+                    // 2. Auto-guess Match Customer
+                    if (!config.matchLabel && customers.length > 0 && config.fileName) {
+                        const guessedName = guessCustomer(config.fileName, customers);
+
+                        if (guessedName) {
+                            updates.matchLabel = guessedName;
                             hasUpdates = true;
                         }
                     }

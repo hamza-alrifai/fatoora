@@ -43,7 +43,6 @@ export interface FileAnalysisResult {
     fileName?: string;
     headers?: Array<{ name: string; index: number }>;
     suggestedIdColumn?: number;
-    suggestedMatchLabel?: string;
     suggestedRowRange?: { start: number; end: number };
     error?: string;
 }
@@ -53,6 +52,8 @@ export interface ProcessExcelOptions {
     targetPaths: string[];
     masterColIndices: number[];
     masterResultColIndex: number;
+    masterQuantityColIndex?: number;
+    masterDescriptionColIndex?: number;
     targetMatchColIndices: Record<string, number[]>;
     targetMatchStrings: Record<string, string>;
     matchSentence: string;
@@ -62,8 +63,19 @@ export interface ProcessExcelOptions {
     targetRowRanges?: Record<string, { start: number; end: number }>;
 }
 
+export interface BackendCustomerStat {
+    total10mm: number;
+    total20mm: number;
+    trips10mm: number;
+    trips20mm: number;
+    totalQuantity: number;
+    items: Array<{ description: string; quantity: number; type: '10mm' | '20mm' | 'other' }>;
+}
+
 export interface ProcessExcelResult {
     success: boolean;
+    masterResultColIndex?: number;
+    customerStats?: Record<string, BackendCustomerStat>;
     stats?: {
         totalMasterRows: number;
         matchedMasterRows: number;

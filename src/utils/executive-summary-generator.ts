@@ -1,10 +1,13 @@
 import ExcelJS from 'exceljs';
 import type { ReconciliationResult } from './reconciliation-engine';
+import type { Customer } from '@/types';
 import { EXCEL_STYLES, EXECUTIVE_SUMMARY_COLUMNS } from './excel-styles';
+import { guessCustomer } from './customer-matching';
 
 export async function generateExecutiveSummaryExcel(
     data: ReconciliationResult,
-    outputFileName: string = 'Executive_Summary.xlsx'
+    outputFileName: string = 'Executive Summary.xlsx',
+    customers: Customer[] = []
 ): Promise<void> {
     console.log('--- Generating Executive Summary ---');
     console.log('Received Data:', data);
@@ -26,44 +29,52 @@ export async function generateExecutiveSummaryExcel(
 
     // --- Data Population ---
 
-    // We want to group by Customer, then by Project
-    // 1. Get all customers from customerStats
-    const customerIds = Object.keys(data.customerStats);
+    // 1. Get all groups from groupStats
+    const groupNames = Object.keys(data.groupStats);
 
-    // Sort customers by name
-    customerIds.sort((a, b) => {
-        const nameA = data.customerStats[a].customer.name.toLowerCase();
-        const nameB = data.customerStats[b].customer.name.toLowerCase();
-        return nameA.localeCompare(nameB);
-    });
+    // Sort groups alphabetically
+    groupNames.sort((a, b) => a.localeCompare(b));
 
     let serial = 1;
-    for (const custId of customerIds) {
-        const custStat = data.customerStats[custId];
-        const customerName = custStat.customer.name;
+    for (const group of groupNames) {
+        const groupStat = data.groupStats[group];
 
-        const totalQty = custStat.total10mm + custStat.total20mm;
-        const totalTrips = custStat.trips10mm + custStat.trips20mm;
+        // Resolve display name: prefer assigned customer, then fuzzy guess, then raw group name
+        let displayName: string;
+        if (groupStat.assignedCustomer?.name) {
+            displayName = groupStat.assignedCustomer.name;
+        } else if (customers.length > 0) {
+            displayName = guessCustomer(groupStat.groupName, customers) || groupStat.groupName;
+        } else {
+            displayName = groupStat.groupName;
+        }
 
-        const pct10 = totalQty > 0 ? custStat.total10mm / totalQty : 0;
-        const pct20 = totalQty > 0 ? custStat.total20mm / totalQty : 0;
+        const totalQty = groupStat.total10mm + groupStat.total20mm;
+        // Read pre-calculated trips from the backend stats
+        const trips10 = groupStat.trips10mm || 0;
+        const trips20 = groupStat.trips20mm || 0;
+        const totalTrips = trips10 + trips20;
+
+        const pct10 = totalQty > 0 ? groupStat.total10mm / totalQty : 0;
+        const pct20 = totalQty > 0 ? groupStat.total20mm / totalQty : 0;
 
         const row = sheet.addRow({
             serial: serial++,
-            customer: customerName,
+            customer: displayName,
             totalQty: totalQty,
-            qty10: custStat.total10mm,
-            qty20: custStat.total20mm,
+            qty10: groupStat.total10mm,
+            qty20: groupStat.total20mm,
             pct10: pct10,
             pct20: pct20,
-            trips10: custStat.trips10mm,
-            trips20: custStat.trips20mm,
+            trips10: trips10,
+            trips20: trips20,
             totalTrips: totalTrips,
-            invoiceNo: 'Draft' // Placeholder or implement logic to fetch actual invoice number if available
+            invoiceNo: 'Draft'
         });
 
         row.eachCell((cell, colNumber) => {
-            cell.style = EXCEL_STYLES.CELL;
+            // Must copy the style object, otherwise we mutate the exported EXCEL_STYLES.CELL globally!
+            cell.style = { ...EXCEL_STYLES.CELL };
             if (colNumber === 3 || colNumber === 4 || colNumber === 5) {
                 cell.numFmt = '#,##0.00';
             }
@@ -87,6 +98,9 @@ export async function generateExecutiveSummaryExcel(
 
     // --- Global Totals ---
     sheet.addRow([]);
+    const grandTot10Trips = groupNames.reduce((acc, g) => acc + (data.groupStats[g].trips10mm || 0), 0);
+    const grandTot20Trips = groupNames.reduce((acc, g) => acc + (data.groupStats[g].trips20mm || 0), 0);
+
     const grandTotalRow = sheet.addRow([
         'GRAND TOTAL',
         '',
@@ -95,14 +109,15 @@ export async function generateExecutiveSummaryExcel(
         data.total20mm,
         '',
         '',
-        Object.values(data.customerStats).reduce((a, b) => a + b.trips10mm, 0),
-        Object.values(data.customerStats).reduce((a, b) => a + b.trips20mm, 0),
-        Object.values(data.customerStats).reduce((a, b) => a + b.trips10mm + b.trips20mm, 0),
+        grandTot10Trips,
+        grandTot20Trips,
+        grandTot10Trips + grandTot20Trips,
         ''
     ]);
 
     grandTotalRow.eachCell((cell, colNumber) => {
-        cell.style = EXCEL_STYLES.GRAND_TOTAL;
+        // Must copy style object
+        cell.style = { ...EXCEL_STYLES.GRAND_TOTAL };
 
         if (colNumber === 3 || colNumber === 4 || colNumber === 5) {
             cell.numFmt = '#,##0.00';

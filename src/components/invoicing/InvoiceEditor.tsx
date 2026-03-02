@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { Invoice } from '@/types';
+import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Save, Trash2, Printer, Receipt } from 'lucide-react';
@@ -7,6 +8,7 @@ import { InvoiceIssueDialog } from './InvoiceIssueDialog';
 import { InvoiceItemsTable } from './InvoiceItemsTable';
 import { Badge } from '@/components/ui/badge';
 import { useInvoiceEditor } from '@/hooks/invoicing/useInvoiceEditor';
+import { calculatePricingModifiers } from '@/utils/pricing-utils';
 
 
 interface InvoiceEditorProps {
@@ -20,11 +22,14 @@ export function InvoiceEditor({ invoice: initialInvoice, onSave, onDelete, onGen
     const {
         invoice,
         setInvoice,
+        customers,
         bankingDetails,
         isLocked,
         handleChange,
         handleSave
     } = useInvoiceEditor({ initialInvoice, onSave });
+
+    const customer = customers.find(c => c.id === invoice.to.customerId) || null;
 
     const [showIssueDialog, setShowIssueDialog] = useState(false);
 
@@ -55,6 +60,39 @@ export function InvoiceEditor({ invoice: initialInvoice, onSave, onDelete, onGen
                         </Badge>
                     )}
                 </div>
+
+                {/* Excess 10mm Pricing Toggle — only visible when there IS excess */}
+                {!isLocked && (() => {
+                    // Check if excess exists by running the pricing engine without disabling
+                    const baseItems = invoice.items.filter(i =>
+                        !i.id?.endsWith('-split-surcharge') && i.id !== 'excess-10mm-surcharge'
+                    );
+                    const pricingCustomer = customer || {
+                        id: invoice.to.customerId || '', name: invoice.to.name, address: invoice.to.address,
+                        total10mm: 0, total20mm: 0, createdAt: '', updatedAt: ''
+                    };
+                    const mods = calculatePricingModifiers(baseItems, pricingCustomer as any, invoice.manualSplits, false, invoice.excessPenaltyRate);
+                    const hasExcess = mods.some(m => m.id === 'excess-10mm-surcharge');
+                    if (!hasExcess) return null;
+                    return (
+                        <button
+                            onClick={() => handleChange('disableExcessPricing', !invoice.disableExcessPricing)}
+                            className={cn(
+                                "flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-medium transition-all border",
+                                invoice.disableExcessPricing
+                                    ? "bg-gray-100 text-gray-400 border-gray-200 hover:bg-gray-200"
+                                    : "bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100"
+                            )}
+                            title={invoice.disableExcessPricing ? "Excess 10mm penalty is OFF" : "Excess 10mm penalty is ON"}
+                        >
+                            <div className={cn(
+                                "w-2 h-2 rounded-full",
+                                invoice.disableExcessPricing ? "bg-gray-300" : "bg-amber-500"
+                            )} />
+                            Excess 10mm
+                        </button>
+                    );
+                })()}
 
                 <div className="flex items-center gap-2">
                     {invoice.id && (
@@ -175,7 +213,13 @@ export function InvoiceEditor({ invoice: initialInvoice, onSave, onDelete, onGen
                                 value={invoice.dueDate ? invoice.dueDate.split('T')[0] : ''}
                                 onChange={(e) => handleChange('dueDate', new Date(e.target.value).toISOString())}
                                 disabled={isLocked}
-                                className="p-1 h-auto border-none bg-transparent hover:bg-blue-50/50 hover:text-blue-700 focus:bg-white focus:ring-2 focus:ring-blue-500/10 focus:shadow-md transition-all duration-200 -mx-1 rounded-md w-full cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed !text-[14px]"
+                                className={cn(
+                                    "p-1 h-auto border border-dashed border-slate-300/70 bg-slate-50/50",
+                                    "hover:bg-blue-50/80 hover:border-blue-400 hover:text-blue-700 hover:shadow-sm",
+                                    "focus:bg-white focus:text-black focus:border-blue-500 focus:border-solid focus:ring-2 focus:ring-blue-500/10 focus:shadow-md",
+                                    "transition-all duration-200 -mx-1 rounded-md w-full cursor-pointer",
+                                    "disabled:border-transparent disabled:bg-transparent disabled:opacity-100 disabled:cursor-default !text-[14px]"
+                                )}
                                 style={{ color: '#1d1d1f', fontFamily: 'inherit' }}
                             />
                         </div>
@@ -189,7 +233,13 @@ export function InvoiceEditor({ invoice: initialInvoice, onSave, onDelete, onGen
                                 value={invoice.lpoNo || ''}
                                 onChange={(e) => handleChange('lpoNo', e.target.value)}
                                 disabled={isLocked}
-                                className="p-1 h-auto border-none bg-transparent hover:bg-blue-50/50 hover:text-blue-700 focus:bg-white focus:text-black focus:ring-2 focus:ring-blue-500/10 focus:shadow-md transition-all duration-200 -mx-1 rounded-md w-full placeholder:text-gray-300 cursor-text disabled:opacity-70 disabled:cursor-not-allowed !text-[14px]"
+                                className={cn(
+                                    "p-1 h-auto border border-dashed border-slate-300/70 bg-slate-50/50",
+                                    "hover:bg-blue-50/80 hover:border-blue-400 hover:text-blue-700 hover:shadow-sm",
+                                    "focus:bg-white focus:text-black focus:border-blue-500 focus:border-solid focus:ring-2 focus:ring-blue-500/10 focus:shadow-md",
+                                    "transition-all duration-200 -mx-1 rounded-md w-full cursor-text placeholder:text-gray-300",
+                                    "disabled:border-transparent disabled:bg-transparent disabled:opacity-100 disabled:cursor-default !text-[14px]"
+                                )}
                                 placeholder="-"
                                 style={{ color: '#1d1d1f', fontFamily: 'inherit' }}
                             />
@@ -205,7 +255,13 @@ export function InvoiceEditor({ invoice: initialInvoice, onSave, onDelete, onGen
                                 value={invoice.lpoDate ? invoice.lpoDate.split('T')[0] : ''}
                                 disabled={isLocked}
                                 onChange={(e) => handleChange('lpoDate', e.target.value)}
-                                className="p-1 h-auto border-none bg-transparent hover:bg-blue-50/50 hover:text-blue-700 focus:bg-white focus:text-black focus:ring-2 focus:ring-blue-500/10 focus:shadow-md transition-all duration-200 -mx-1 rounded-md w-full text-gray-500 focus:text-black cursor-pointer !text-[14px]"
+                                className={cn(
+                                    "p-1 h-auto border border-dashed border-slate-300/70 bg-slate-50/50",
+                                    "hover:bg-blue-50/80 hover:border-blue-400 hover:text-blue-700 hover:shadow-sm",
+                                    "focus:bg-white focus:text-black focus:border-blue-500 focus:border-solid focus:ring-2 focus:ring-blue-500/10 focus:shadow-md",
+                                    "transition-all duration-200 -mx-1 rounded-md w-full cursor-pointer text-gray-500 focus:text-black",
+                                    "disabled:border-transparent disabled:bg-transparent disabled:opacity-100 disabled:cursor-default !text-[14px]"
+                                )}
                                 style={{ fontFamily: 'inherit' }}
                             />
                         </div>
@@ -219,7 +275,13 @@ export function InvoiceEditor({ invoice: initialInvoice, onSave, onDelete, onGen
                                 value={invoice.commercialOfferRef || ''}
                                 onChange={(e) => handleChange('commercialOfferRef', e.target.value)}
                                 disabled={isLocked}
-                                className="p-1 h-auto border-none bg-transparent hover:bg-blue-50/50 hover:text-blue-700 focus:bg-white focus:text-black focus:ring-2 focus:ring-blue-500/10 focus:shadow-md transition-all duration-200 -mx-1 rounded-md w-full placeholder:text-gray-300 cursor-text disabled:opacity-70 disabled:cursor-not-allowed !text-[14px]"
+                                className={cn(
+                                    "p-1 h-auto border border-dashed border-slate-300/70 bg-slate-50/50",
+                                    "hover:bg-blue-50/80 hover:border-blue-400 hover:text-blue-700 hover:shadow-sm",
+                                    "focus:bg-white focus:text-black focus:border-blue-500 focus:border-solid focus:ring-2 focus:ring-blue-500/10 focus:shadow-md",
+                                    "transition-all duration-200 -mx-1 rounded-md w-full cursor-text placeholder:text-gray-300",
+                                    "disabled:border-transparent disabled:bg-transparent disabled:opacity-100 disabled:cursor-default !text-[14px]"
+                                )}
                                 placeholder="-"
                                 style={{ color: '#1d1d1f', fontFamily: 'inherit' }}
                             />
@@ -235,7 +297,13 @@ export function InvoiceEditor({ invoice: initialInvoice, onSave, onDelete, onGen
                                 value={invoice.commercialOfferDate ? invoice.commercialOfferDate.split('T')[0] : ''}
                                 onChange={(e) => handleChange('commercialOfferDate', e.target.value)}
                                 disabled={isLocked}
-                                className="p-1 h-auto border-none bg-transparent hover:bg-blue-50/50 hover:text-blue-700 focus:bg-white focus:text-black focus:ring-2 focus:ring-blue-500/10 focus:shadow-md transition-all duration-200 -mx-1 rounded-md w-full text-gray-500 focus:text-black cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed !text-[14px]"
+                                className={cn(
+                                    "p-1 h-auto border border-dashed border-slate-300/70 bg-slate-50/50",
+                                    "hover:bg-blue-50/80 hover:border-blue-400 hover:text-blue-700 hover:shadow-sm",
+                                    "focus:bg-white focus:text-black focus:border-blue-500 focus:border-solid focus:ring-2 focus:ring-blue-500/10 focus:shadow-md",
+                                    "transition-all duration-200 -mx-1 rounded-md w-full cursor-pointer text-gray-500 focus:text-black",
+                                    "disabled:border-transparent disabled:bg-transparent disabled:opacity-100 disabled:cursor-default !text-[14px]"
+                                )}
                                 style={{ fontFamily: 'inherit' }}
                             />
                         </div>
@@ -251,13 +319,19 @@ export function InvoiceEditor({ invoice: initialInvoice, onSave, onDelete, onGen
                                 <div style={{ fontSize: '14px', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#86868b', marginBottom: '4px' }}>
                                     Payment Terms
                                 </div>
-                                <Input
+                                <textarea
                                     value={invoice.paymentTerms || ''}
                                     onChange={(e) => handleChange('paymentTerms', e.target.value)}
                                     disabled={isLocked}
-                                    className="p-1 h-auto border-none bg-transparent hover:bg-blue-50/50 hover:text-blue-700 focus:bg-white focus:text-black focus:ring-2 focus:ring-blue-500/10 focus:shadow-md transition-all duration-200 -mx-1 rounded-md w-full cursor-text disabled:opacity-70 disabled:cursor-not-allowed !text-[14px]"
+                                    className={cn(
+                                        "p-1 border border-dashed border-slate-300/70 bg-slate-50/50",
+                                        "hover:bg-blue-50/80 hover:border-blue-400 hover:text-blue-700 hover:shadow-sm",
+                                        "focus:bg-white focus:text-black focus:border-blue-500 focus:border-solid focus:ring-2 focus:ring-blue-500/10 focus:shadow-md",
+                                        "transition-all duration-200 -mx-1 rounded-md w-full cursor-text resize-none",
+                                        "disabled:border-transparent disabled:bg-transparent disabled:opacity-100 disabled:cursor-default !text-[14px]"
+                                    )}
                                     placeholder="Payment due within 30 days."
-                                    style={{ color: '#6e6e73', lineHeight: 1.4, fontFamily: 'inherit' }}
+                                    style={{ color: '#6e6e73', lineHeight: 1.4, fontFamily: 'inherit', minHeight: '60px' }}
                                 />
                             </div>
 
@@ -271,7 +345,7 @@ export function InvoiceEditor({ invoice: initialInvoice, onSave, onDelete, onGen
                                         <span style={{ fontWeight: 500, color: '#333' }}>Beneficiary:</span> <span>{bankingDetails.beneficiaryName}</span>
                                         <span style={{ fontWeight: 500, color: '#333' }}>Bank:</span> <span>{bankingDetails.beneficiaryBank}</span>
                                         <span style={{ fontWeight: 500, color: '#333' }}>Branch:</span> <span>{bankingDetails.branch}</span>
-                                        <span style={{ fontWeight: 500, color: '#333' }}>IBAN:</span> <span style={{ fontFamily: 'monospace', fontSize: '14px' }}>{bankingDetails.ibanNo}</span>
+                                        <span style={{ fontWeight: 500, color: '#333' }}>IBAN:</span> <span style={{ fontFamily: 'monospace', fontSize: '14px' }}>{bankingDetails.ibanNo?.replace(/(.{4})/g, '$1 ').trim()}</span>
                                         <span style={{ fontWeight: 500, color: '#333' }}>SWIFT:</span> <span style={{ fontFamily: 'monospace', fontSize: '14px' }}>{bankingDetails.swiftCode}</span>
                                     </div>
                                 </div>
@@ -298,7 +372,7 @@ export function InvoiceEditor({ invoice: initialInvoice, onSave, onDelete, onGen
                         </div>
                     </div>
 
-                    <InvoiceItemsTable invoice={invoice} setInvoice={setInvoice} isLocked={isLocked} />
+                    <InvoiceItemsTable invoice={invoice} setInvoice={setInvoice} isLocked={isLocked} customer={customer} />
 
                     {/* Total Section */}
                     <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '20px' }}>

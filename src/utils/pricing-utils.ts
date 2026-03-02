@@ -1,208 +1,133 @@
 /**
- * Pricing calculation utilities
- * Consolidates split pricing and excess charge logic
+ * Pricing calculation utilities (Non-Destructive Line Item Modifier Architecture)
+ * Applies financial rules (split pricing, 40% excess) by calculating adjustments
+ * to be appended to an invoice, preserving the raw physical item quantities.
  */
 
-import type { ProductType } from './product-utils';
+import type { Customer, InvoiceItem } from '../types';
 
-export interface SplitPricingConfig {
-    enabled: boolean;
-    threshold: number;
-    rate1: number;
-    rate2: number;
-}
+/** Default threshold for excess 10mm penalty (40%) */
+const DEFAULT_EXCESS_THRESHOLD = 0.40;
 
-export interface InvoiceItem {
-    id: string;
-    description: string;
-    quantity: number;
-    unitPrice: number;
-    amount: number;
-    type: ProductType;
+/**
+ * Calculates financial modifiers based on defined pricing rules without mutating the base items.
+ * Modifiers are returned as standalone InvoiceItems that can be appended to the invoice.
+ *
+ * @param items - The RAW physical base items matched from Excel
+ * @param customer - The customer object containing pricing config and historical volume
+ * @returns Array of newly generated surcharge/modifier InvoiceItems
+ */
+export function calculatePricingModifiers(
+    items: InvoiceItem[],
+    customer: Customer,
+    manualSplits?: Record<string, { splitQty: number; splitRate: number; baseRate: number }>,
+    disableExcess?: boolean,
+    excessPenaltyRate?: number
+): InvoiceItem[] {
+    const modifiers: InvoiceItem[] = [];
+
+    // 1. Process Manual Split Pricing Overrides
+    if (manualSplits) {
+        const splitMods = calculateManualSplitPricingModifiers(items, manualSplits);
+        modifiers.push(...splitMods);
+    }
+
+    // 2. Process Excess Penalty (automatic for all customers, opt-out per invoice)
+    if (!disableExcess) {
+        const penaltyRate = excessPenaltyRate ?? customer.excessPricing?.penaltyRate ?? 0;
+        const excessMod = calculateExcessPricingModifier(
+            items,
+            { enabled: true, ratioThreshold: DEFAULT_EXCESS_THRESHOLD, penaltyRate },
+            customer.total10mm,
+            customer.total20mm
+        );
+        if (excessMod) modifiers.push(excessMod);
+    }
+
+    return modifiers;
 }
 
 /**
- * Apply split pricing to items based on configuration
- * Splits items at a threshold into two tiers with different rates
- * 
- * @param items - Array of invoice items to process
- * @param splitConfig - Split pricing configuration
- * @param targetType - Product type to apply split to
- * @returns New array with split items
+ * Calculates a split pricing surcharge dynamically per item based on user manual UI inputs.
+ * It strictly applies the rate difference mathematically to the specified split quantity,
+ * generating discrete Surcharge line items mapped to the original item ID.
  */
-export function applySplitPricing(
+function calculateManualSplitPricingModifiers(
     items: InvoiceItem[],
-    splitConfig: SplitPricingConfig | undefined,
-    targetType: ProductType
+    manualSplits: Record<string, { splitQty: number; splitRate: number; baseRate: number }>
 ): InvoiceItem[] {
-    if (!splitConfig || !splitConfig.enabled) {
-        return items;
-    }
+    const modifiers: InvoiceItem[] = [];
 
-    const { threshold, rate1, rate2 } = splitConfig;
-    const resultItems: InvoiceItem[] = [];
-
+    // Safety check - we only generate modifiers for items that exist in our base pass
     items.forEach(item => {
-        if (item.type !== targetType) {
-            resultItems.push(item);
-            return;
-        }
+        const manualSplit = manualSplits[item.id!];
+        if (manualSplit && manualSplit.splitQty >= 0) {
 
-        if (item.quantity <= threshold) {
-            resultItems.push({
-                ...item,
-                unitPrice: rate1,
-                amount: Math.round(item.quantity * rate1 * 100) / 100,
-            });
-        } else {
-            const tier1Qty = threshold;
-            const tier2Qty = item.quantity - threshold;
+            // Limit split quantity to the strict maximum physical base quantity
+            const safeSplitQty = Math.min(item.quantity, manualSplit.splitQty);
+            const amount = Math.round(safeSplitQty * manualSplit.splitRate * 100) / 100;
 
-            resultItems.push({
-                ...item,
-                id: crypto.randomUUID(),
-                quantity: tier1Qty,
-                unitPrice: rate1,
-                amount: Math.round(tier1Qty * rate1 * 100) / 100,
-            });
-
-            resultItems.push({
-                ...item,
-                id: crypto.randomUUID(),
-                quantity: tier2Qty,
-                unitPrice: rate2,
-                amount: Math.round(tier2Qty * rate2 * 100) / 100,
-                description: `${item.description} (> ${threshold})`,
+            modifiers.push({
+                id: `${item.id}-split-surcharge`,
+                description: `↳ Split`,
+                quantity: Math.round(safeSplitQty * 100) / 100,
+                unitPrice: manualSplit.splitRate,
+                amount: amount,
+                type: 'other'
             });
         }
     });
 
-    return resultItems;
+    return modifiers;
 }
 
 /**
- * Apply cumulative split pricing (for invoice generation)
- * Processes items sequentially, tracking remaining tier 1 capacity
+ * Calculates an excess material penalty if the cumulative ratio (e.g. 10mm)
+ * exceeds the allowed ratio limit (e.g. 40% of Total (10mm + 20mm)).
  */
-export function applyCumulativeSplitPricing(
+function calculateExcessPricingModifier(
     items: InvoiceItem[],
-    splitConfig: SplitPricingConfig | undefined,
-    targetType: ProductType
-): InvoiceItem[] {
-    if (!splitConfig || !splitConfig.enabled) {
-        return items;
-    }
-
-    const { threshold, rate1, rate2 } = splitConfig;
-    let remainingTier1 = threshold;
-    const resultItems: InvoiceItem[] = [];
-
-    items.forEach(item => {
-        if (item.type !== targetType) {
-            resultItems.push(item);
-            return;
-        }
-
-        if (remainingTier1 > 0) {
-            const tier1Alloc = Math.min(item.quantity, remainingTier1);
-
-            resultItems.push({
-                ...item,
-                id: crypto.randomUUID(),
-                unitPrice: rate1,
-                amount: Math.round(tier1Alloc * rate1 * 100) / 100,
-                quantity: tier1Alloc,
-                description: item.description + ' (Tier 1)',
-            });
-
-            remainingTier1 -= tier1Alloc;
-
-            if (item.quantity > tier1Alloc) {
-                const tier2Qty = Math.round((item.quantity - tier1Alloc) * 100) / 100;
-                resultItems.push({
-                    ...item,
-                    id: crypto.randomUUID(),
-                    unitPrice: rate2,
-                    amount: Math.round(tier2Qty * rate2 * 100) / 100,
-                    quantity: tier2Qty,
-                    description: item.description + ' (Tier 2)',
-                });
-            }
-        } else {
-            resultItems.push({
-                ...item,
-                unitPrice: rate2,
-                amount: Math.round(item.quantity * rate2 * 100) / 100,
-                description: item.description + ' (Tier 2)',
-            });
-        }
-    });
-
-    return resultItems;
-}
-
-/**
- * Calculate excess 10mm charge based on 60/40 ratio rule
- * If cumulative 10mm exceeds 40% of total (10mm + 20mm), excess is charged at special rate
- * 
- * @returns Object with excess quantity and items with excess applied
- */
-export function calculateExcess10mm(
-    items: InvoiceItem[],
-    excessRate: number,
+    config: { enabled: boolean; ratioThreshold: number; penaltyRate: number },
     historicalTotal10mm: number,
     historicalTotal20mm: number
-): { excessQuantity: number; items: InvoiceItem[] } {
-    if (excessRate <= 0) {
-        return { excessQuantity: 0, items };
-    }
-
+): InvoiceItem | null {
+    // 1. Sum up current physical volumes
     const current10 = items.filter(i => i.type === '10mm').reduce((sum, i) => sum + i.quantity, 0);
     const current20 = items.filter(i => i.type === '20mm').reduce((sum, i) => sum + i.quantity, 0);
 
+    // 2. Calculate Cumulative Totals
     const cumulative10 = historicalTotal10mm + current10;
     const cumulative20 = historicalTotal20mm + current20;
     const cumulativeTotal = cumulative10 + cumulative20;
 
-    const allowedCumulative10 = cumulativeTotal * 0.40;
+    if (cumulativeTotal === 0) return null;
+
+    // 3. Determine the allowed threshold for 10mm
+    const allowedCumulative10 = cumulativeTotal * config.ratioThreshold;
     const cumulativeExcess = Math.max(0, cumulative10 - allowedCumulative10);
 
-    const historicalExcess = Math.max(0, historicalTotal10mm - (historicalTotal10mm + historicalTotal20mm) * 0.40);
+    // 4. Calculate what was already penalized historically so we don't double charge
+    const historicalTotal = historicalTotal10mm + historicalTotal20mm;
+    const allowedHistorical10 = historicalTotal * config.ratioThreshold;
+    const historicalExcess = Math.max(0, historicalTotal10mm - allowedHistorical10);
+
+    // 5. The new excess that occurred precisely in this invoice period
     const newExcessQty = Math.max(0, cumulativeExcess - historicalExcess);
 
-    if (newExcessQty <= 0) {
-        return { excessQuantity: 0, items };
+    if (newExcessQty <= 0.001) {
+        return null;
     }
 
-    const updatedItems = [...items];
-    let remainingDeduction = newExcessQty;
-    let actuallyDeducted = 0;
+    const actuallyAllocatedExcess = Math.min(newExcessQty, current10); // Cannot charge more excess than what was physically shipped today
 
-    updatedItems
-        .filter(i => i.type === '10mm')
-        .forEach(item => {
-            if (remainingDeduction <= 0) return;
-
-            const deduction = Math.min(item.quantity, remainingDeduction);
-            item.quantity = Math.round((item.quantity - deduction) * 100) / 100;
-            item.amount = Math.round(item.quantity * item.unitPrice * 100) / 100;
-            remainingDeduction = Math.round((remainingDeduction - deduction) * 100) / 100;
-            actuallyDeducted = Math.round((actuallyDeducted + deduction) * 100) / 100;
-        });
-
-    if (actuallyDeducted > 0.001) {
-        updatedItems.push({
-            id: crypto.randomUUID(),
-            description: 'Excess 10mm Charge (>40%)',
-            quantity: Math.round(actuallyDeducted * 100) / 100,
-            unitPrice: excessRate,
-            amount: Math.round(actuallyDeducted * excessRate * 100) / 100,
-            type: '10mm',
-        });
-    }
+    if (actuallyAllocatedExcess <= 0.001) return null;
 
     return {
-        excessQuantity: actuallyDeducted,
-        items: updatedItems.filter(i => i.quantity > 0.001),
+        id: 'excess-10mm-surcharge',
+        description: `Excess 10mm Ratio Surcharge (> ${(config.ratioThreshold * 100).toFixed(0)}%)`,
+        quantity: Math.round(actuallyAllocatedExcess * 100) / 100,
+        unitPrice: config.penaltyRate,
+        amount: Math.round(actuallyAllocatedExcess * config.penaltyRate * 100) / 100,
+        type: 'other' // Modifiers are 'other', not '10mm', so they don't break subsequent ratio math
     };
 }

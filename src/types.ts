@@ -25,7 +25,6 @@ export interface FileAnalysis {
         isNew: boolean;
     };
     suggestedRowRange?: { start: number; end: number };
-    suggestedMatchLabel?: string;
     preview?: any[][];
     error?: string;
     analysisReport?: {
@@ -35,6 +34,13 @@ export interface FileAnalysis {
 }
 
 // Invoicing Types
+
+export interface ExcessPricingConfig {
+    enabled: boolean;
+    ratioThreshold: number; // e.g. 0.40 for 40%
+    penaltyRate: number;
+}
+
 export interface Customer {
     id: string;
     name: string;
@@ -44,6 +50,7 @@ export interface Customer {
     // For 60/40 ratio calculation
     total20mm: number;
     total10mm: number;
+    excessPricing?: ExcessPricingConfig;
     createdAt: string;
     updatedAt: string;
 }
@@ -92,6 +99,9 @@ export interface Invoice {
     total: number;
     currency: string;
     notes?: string;
+    manualSplits?: Record<string, { splitQty: number; splitRate: number; baseRate: number }>;
+    disableExcessPricing?: boolean; // Per-invoice opt-out (default: false = excess applied)
+    excessPenaltyRate?: number; // Per-invoice rate override for excess 10mm penalty
     createdAt: string;
     updatedAt: string;
 }
@@ -137,6 +147,8 @@ export interface ElectronAPI {
         targetPaths: string[];
         masterColIndices: number[];
         masterResultColIndex: number;
+        masterQuantityColIndex?: number;
+        masterDescriptionColIndex?: number;
         targetMatchColIndices: Record<string, number[]>;
         targetMatchStrings: Record<string, string>;
         matchSentence: string;
@@ -148,6 +160,8 @@ export interface ElectronAPI {
         targetSheetNames?: Record<string, string>;
     }) => Promise<{
         success: boolean;
+        masterResultColIndex?: number;
+        customerStats?: Record<string, any>;
         results?: any[];
         stats?: {
             totalMasterRows: number;
@@ -187,7 +201,6 @@ export interface ElectronAPI {
     saveInvoice: (invoice: Invoice) => Promise<{ success: boolean; id?: string; error?: string }>;
     getInvoices: () => Promise<{ success: boolean; invoices?: Invoice[]; error?: string }>;
     deleteInvoice: (id: string) => Promise<{ success: boolean; error?: string }>;
-    generateInvoicePDF: (invoice: Invoice) => Promise<{ success: boolean; filePath?: string; error?: string }>;
     generateSecureInvoice: (invoice: Invoice, appUrl?: string) => Promise<{ success: boolean; error?: string }>;
     onInvoiceData: (callback: (event: any, data: any) => void) => void;
     sendPrintReady: () => void;

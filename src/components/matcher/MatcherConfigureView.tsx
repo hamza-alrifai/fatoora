@@ -3,12 +3,11 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Loader2, AlertCircle, ArrowLeft, Database, Wand2, ArrowRight, User } from 'lucide-react';
+import { Loader2, AlertCircle, ArrowLeft, Database, Wand2, User } from 'lucide-react';
 import type { FileAnalysis, Customer } from "../../types";
 import { GlassDialog } from '@/components/ui/glass-dialog';
 import { SheetPreview } from '@/components/SheetPreview';
 import { FileConfigurationCard } from './FileConfigurationCard';
-import { guessCustomer } from '@/utils/customer-matching';
 
 interface FileConfig extends FileAnalysis {
     matchLabel?: string;
@@ -157,7 +156,6 @@ export default function MatcherConfigureView({
                                         index={idx}
                                         isMaster={false}
                                         customers={customers}
-                                        guessCustomer={guessCustomer}
                                         onSheetChange={(val) => handleSheetChange(false, idx, val)}
                                         onIdColumnChange={(val) => updateTarget(idx, { overrideIdColumn: val })}
                                         onMatchCustomerChange={(val) => updateTarget(idx, { matchLabel: val })}

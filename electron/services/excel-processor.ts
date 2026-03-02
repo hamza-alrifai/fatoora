@@ -11,15 +11,26 @@ import {
     RESULT_COLUMN_PATTERNS,
     findFirstEmptyColumn,
     analyzeColumnQuality,
-    generateMatchLabel,
-    normalizeValue
+    normalizeValue,
+    normalizeMatchKeyItem
 } from '../utils/excel-utils';
+
+export interface BackendCustomerStat {
+    total10mm: number;
+    total20mm: number;
+    trips10mm: number;
+    trips20mm: number;
+    totalQuantity: number;
+    items: Array<{ description: string; quantity: number; type: '10mm' | '20mm' | 'other' }>;
+}
 
 export interface ProcessOptions {
     masterPath: string;
     targetPaths: string[];
     masterColIndices: number[];
     masterResultColIndex: number;
+    masterQuantityColIndex?: number;
+    masterDescriptionColIndex?: number;
     targetMatchColIndices: Record<string, number[]>;
     targetMatchStrings: Record<string, string>;
     matchSentence: string;
@@ -52,8 +63,8 @@ export async function analyzeExcelFile(filePath: string, sheetName?: string) {
         const headerRowIndex = findHeaderRow(data);
         const headers = data[headerRowIndex] || [];
 
-        // Find footer row
-        const footerStartRow = findFooterStartRow(data);
+        // Find footer row by passing header position as starting point
+        const footerStartRow = findFooterStartRow(data, headerRowIndex);
         const dataRowCount = Math.max(0, footerStartRow - headerRowIndex - 1);
         const startRow = headerRowIndex + 1; // 0-indexed start of data
         const endRow = footerStartRow; // 0-indexed end of data (exclusive)
@@ -84,9 +95,6 @@ export async function analyzeExcelFile(filePath: string, sheetName?: string) {
             end: footerStartRow // 1-indexed (based on length)
         };
 
-        // Generate match label from filename
-        const suggestedMatchLabel = generateMatchLabel(filePath);
-
         // Calculate overall data quality score
         const overallScore = idColumnAnalysis ? idColumnAnalysis.score : (fileIssues.length > 0 ? 50 : 100);
 
@@ -116,7 +124,6 @@ export async function analyzeExcelFile(filePath: string, sheetName?: string) {
                 isNew: !existingResultColumn
             },
             suggestedRowRange,
-            suggestedMatchLabel,
             analysisReport: {
                 qualityScore: overallScore,
                 issues: fileIssues
@@ -129,7 +136,21 @@ export async function analyzeExcelFile(filePath: string, sheetName?: string) {
 
 export async function processExcelJob(options: ProcessOptions) {
     try {
-        const { masterPath, targetPaths, masterColIndices, masterResultColIndex, targetMatchColIndices, targetMatchStrings, noMatchSentence, outputPath, masterRowRange, targetRowRanges, masterSheetName, targetSheetNames } = options;
+        const { masterPath, targetPaths, masterColIndices, targetMatchColIndices, targetMatchStrings, noMatchSentence, outputPath, masterRowRange, targetRowRanges, masterSheetName, targetSheetNames } = options;
+        const masterQtyCol = options.masterQuantityColIndex ?? -1;
+        const masterDescCol = options.masterDescriptionColIndex ?? -1;
+        let { masterResultColIndex } = options;
+
+        // Inline 10mm/20mm detection (no frontend import needed)
+        const detectType = (desc: string, rowText: string): '10mm' | '20mm' | 'other' => {
+            const t = (desc + ' ' + rowText).toLowerCase().replace(/[\s\-_]/g, '');
+            if (t.includes('10mm')) return '10mm';
+            if (t.includes('20mm')) return '20mm';
+            return 'other';
+        };
+
+        // Per-customer accumulation
+        const customerStats: Record<string, BackendCustomerStat> = {};
 
         // Validation tracking
         const validationWarnings: Array<{ type: string; file: string; row: number; message: string }> = [];
@@ -151,6 +172,12 @@ export async function processExcelJob(options: ProcessOptions) {
 
         const masterData = XLSX.utils.sheet_to_json(masterSheet, { header: 1, raw: true, defval: '' }) as any[][];
 
+        console.log(`[processExcelJob] Initial masterResultColIndex: ${masterResultColIndex}`);
+        if (masterResultColIndex === -1) {
+            masterResultColIndex = findFirstEmptyColumn(masterData);
+            console.log(`[processExcelJob] Reassigned masterResultColIndex to: ${masterResultColIndex}`);
+        }
+
         const masterLookup = new Set<string>();
 
         // Determine row range for master file
@@ -161,12 +188,9 @@ export async function processExcelJob(options: ProcessOptions) {
         for (let i = masterStart; i < masterEnd && i < masterData.length; i++) {
             const row = masterData[i];
             if (Array.isArray(row)) {
-                const masterValues = masterColIndices
-                    .map(colIdx => normalizeValue(row[colIdx]))
-                    .filter(val => val !== '');
-
-                if (masterValues.length > 0) {
-                    const key = masterValues.join('|'); // Use pipe separator
+                const masterKeyStr = normalizeMatchKeyItem(row[masterColIndices[0]]);
+                if (masterKeyStr !== '') {
+                    const key = masterKeyStr; // Already lowercased by normalizer
 
                     // Check for empty QPMC ticket
                     const rawTicket = row[masterColIndices[0]];
@@ -199,6 +223,10 @@ export async function processExcelJob(options: ProcessOptions) {
                     }
 
                     masterLookup.add(key);
+
+                    if (key === '9002106182') {
+                        console.log(`[DEBUG] Added 9002106182 to masterLookup from row ${i + 1}`);
+                    }
                 }
             }
         }
@@ -250,32 +278,14 @@ export async function processExcelJob(options: ProcessOptions) {
                     const row = targetData[rowIndex];
                     if (!Array.isArray(row)) continue;
 
-                    const values = targetMatchColIndices_forFile
-                        .map(colIdx => normalizeValue(row[colIdx]))
-                        .filter(val => val !== '');
+                    const targetKeyStr = normalizeMatchKeyItem(row[targetMatchColIndices_forFile[0]]);
 
-                    if (values.length > 0) {
-                        const key = values.join('|');
+                    if (targetKeyStr !== '') {
+                        const key = targetKeyStr;
+                        const lowerKey = key;
 
-                        const lowerKey = key.toLowerCase();
-                        const looksLikeTicket = /^\d{10}$/.test(key.trim());
-
-                        const footerKeywords = [
-                            'total', 'sum', 'size', 'qty', 'quantity', 'percentage',
-                            'no of trip', 'trip', 'count', 'grand total',
-                            '10 mm', '20 mm', '10mm', '20mm', '30 mm', '40 mm',
-                            'aggregate', 'average', 'avg', 'subtotal', 'sub-total',
-                            'qpmc ticket', 'ticket no', 'serial no', 'readymix',
-                            'report', 'supply', 'material', 'vehicle type'
-                        ];
-
-                        const isFooterRow = footerKeywords.some(kw => lowerKey.includes(kw));
-
-                        const isInvalidRow =
-                            key.length === 0 ||
-                            isFooterRow ||
-                            (lowerKey.includes('date') && lowerKey.length < 15) ||
-                            (!looksLikeTicket && key.length < 8);
+                        // Only skip row if key is entirely empty or literally just a header word exactly
+                        const isInvalidRow = key.length === 0;
 
                         if (isInvalidRow) {
                             continue;
@@ -291,6 +301,10 @@ export async function processExcelJob(options: ProcessOptions) {
                             targetLookup.get(key)!.add(matchString);
                             stats.matched++;
 
+                            if (key === '9002106182') {
+                                console.log(`[DEBUG] Target matched 9002106182 on row ${rowIndex + 1} with label ${matchString}`);
+                            }
+
                             matchedRows.push({
                                 sourceFile: targetPath,
                                 data: row,
@@ -298,7 +312,7 @@ export async function processExcelJob(options: ProcessOptions) {
                             });
 
                         } else {
-                            unmatchedRows.push([...row, path.basename(targetPath)]);
+                            unmatchedRows.push([...row, matchString]);
                         }
                     }
                 }
@@ -312,41 +326,83 @@ export async function processExcelJob(options: ProcessOptions) {
         const updateStart = masterRowRange ? masterRowRange.start - 1 : 1;
         const updateEnd = masterRowRange ? masterRowRange.end : masterData.length;
 
+        let rowOffset = 0;
         if (masterSheet['!ref']) {
             const range = XLSX.utils.decode_range(masterSheet['!ref']);
+            rowOffset = range.s.r; // Handle sheets that don't start at row 1 logically
             if (masterResultColIndex > range.e.c) {
                 range.e.c = masterResultColIndex;
                 masterSheet['!ref'] = XLSX.utils.encode_range(range);
             }
         }
 
+        // Add header if it was a newly created column
+        if (options.masterResultColIndex === -1 && updateStart > 0) {
+            const headerCellRef = XLSX.utils.encode_cell({ r: rowOffset + updateStart - 1, c: masterResultColIndex });
+            masterSheet[headerCellRef] = { t: 's', v: 'Match Result' };
+        }
+
         for (let i = updateStart; i < updateEnd && i < masterData.length; i++) {
             const row = masterData[i];
             if (!Array.isArray(row)) continue;
 
-            const values = masterColIndices
-                .map(colIdx => normalizeValue(row[colIdx]))
-                .filter(val => val !== '');
+            const updateKeyStr = normalizeMatchKeyItem(row[masterColIndices[0]]);
 
             let resultValue = '';
 
-            if (values.length > 0) {
-                const key = values.join('|');
+            if (updateKeyStr !== '') {
+                const key = updateKeyStr;
 
                 if (targetLookup.has(key)) {
                     const matchStrings = Array.from(targetLookup.get(key)!);
                     resultValue = matchStrings.join(', ');
                     matchCount++;
+
+                    if (key === '9002106182') {
+                        console.log(`[DEBUG] Final master update for 9002106182 on row ${i + 1}. Wrote: ${resultValue}`);
+                    }
                 } else {
                     if (noMatchSentence) {
                         resultValue = noMatchSentence;
+                    }
+                    if (key === '9002106182') {
+                        console.log(`[DEBUG] Final master update for 9002106182 on row ${i + 1}. Result: NO MATCH. Why? targetLookup had it? ${targetLookup.has(key)}`);
                     }
                 }
             }
 
             if (resultValue) {
-                const cellRef = XLSX.utils.encode_cell({ r: i, c: masterResultColIndex });
+                const physicalRow = rowOffset + i;
+                const cellRef = XLSX.utils.encode_cell({ r: physicalRow, c: masterResultColIndex });
                 masterSheet[cellRef] = { t: 's', v: resultValue };
+            }
+
+            if (resultValue && targetLookup.has(updateKeyStr)) {
+                // Accumulate per-customer stats using the match string
+                const matchedCustomers = Array.from(targetLookup.get(updateKeyStr)!);
+                for (const customerName of matchedCustomers) {
+                    if (!customerStats[customerName]) {
+                        customerStats[customerName] = { total10mm: 0, total20mm: 0, trips10mm: 0, trips20mm: 0, totalQuantity: 0, items: [] };
+                    }
+                    const stat = customerStats[customerName];
+                    const rawQty = masterQtyCol >= 0 ? row[masterQtyCol] : undefined;
+                    const qty = rawQty !== undefined && rawQty !== '' ? parseFloat(String(rawQty).replace(/[,\s\u200B-\u200D\uFEFF]/g, '')) || 0 : 0;
+                    const desc = masterDescCol >= 0 ? String(row[masterDescCol] || '') : '';
+                    const fullText = row.map((c: any) => String(c || '')).join(' ');
+                    const type = detectType(desc, fullText);
+
+                    stat.totalQuantity = Math.round((stat.totalQuantity + qty) * 100) / 100;
+                    if (type === '10mm') { stat.total10mm = Math.round((stat.total10mm + qty) * 100) / 100; stat.trips10mm++; }
+                    if (type === '20mm') { stat.total20mm = Math.round((stat.total20mm + qty) * 100) / 100; stat.trips20mm++; }
+
+                    // Accumulate items
+                    const existingItem = stat.items.find(it => it.description === desc && it.type === type);
+                    if (existingItem) {
+                        existingItem.quantity = Math.round((existingItem.quantity + qty) * 100) / 100;
+                    } else if (desc || qty > 0) {
+                        stat.items.push({ description: desc || `Item`, quantity: qty, type });
+                    }
+                }
             }
         }
 
@@ -396,6 +452,8 @@ export async function processExcelJob(options: ProcessOptions) {
 
         return {
             success: true,
+            masterResultColIndex,
+            customerStats,
             results: [{
                 path: masterPath,
                 status: 'success',

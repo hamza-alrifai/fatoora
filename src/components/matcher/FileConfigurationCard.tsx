@@ -23,7 +23,6 @@ interface FileConfigurationCardProps {
     onMatchCustomerChange?: (val: string | undefined) => void;
     onRemove?: () => void;
     onPreview: () => void;
-    guessCustomer?: (fileName: string, customers: Customer[]) => string | undefined;
 }
 
 export const FileConfigurationCard = ({
@@ -36,8 +35,7 @@ export const FileConfigurationCard = ({
     onResultColumnChange,
     onMatchCustomerChange,
     onRemove,
-    onPreview,
-    guessCustomer
+    onPreview
 }: FileConfigurationCardProps) => {
     return (
         <Card className="overflow-hidden border-border/60 shadow-sm transition-all hover:shadow-md">
@@ -98,7 +96,7 @@ export const FileConfigurationCard = ({
                                     const intVal = parseInt(val);
                                     onIdColumnChange(isNaN(intVal) ? undefined : intVal);
                                 }}
-                                options={config.headers?.map(h => ({ value: h.index, label: h.name })) || []}
+                                options={config.headers?.map(h => ({ value: h?.index, label: h?.name })) || []}
                                 placeholder="Select unique ID column..."
                                 autoDetected={config.idColumn?.index !== undefined && config.overrideIdColumn === config.idColumn.index}
                                 className="h-8 text-xs"
@@ -119,7 +117,7 @@ export const FileConfigurationCard = ({
                                     options={[
                                         // { value: undefined, label: '-- Select --' }, // CustomSelect handles placeholder if value is undefined
                                         { value: -1, label: `✨ Create New Column` },
-                                        ...(config.headers?.map(h => ({ value: h.index, label: h.name })) || [])
+                                        ...(config.headers?.map(h => ({ value: h?.index, label: h?.name })) || [])
                                     ]}
                                     placeholder="-- Select --"
                                     className="h-8 text-xs border-indigo-200 focus:border-indigo-500"
@@ -133,10 +131,9 @@ export const FileConfigurationCard = ({
                                 <CustomSelect
                                     value={config.matchLabel}
                                     onChange={(val) => onMatchCustomerChange && onMatchCustomerChange(val || undefined)}
-                                    options={customers.map(c => ({ value: c.name, label: c.name }))}
+                                    options={customers.map(c => ({ value: c?.name || '', label: c?.name || 'Unnamed Customer' }))}
                                     placeholder="Select customer..."
                                     className="h-8 text-xs"
-                                    autoDetected={!!(guessCustomer && config.matchLabel && guessCustomer(config.fileName || '', customers) === config.matchLabel)}
                                 />
                             </div>
                         )}

@@ -7,8 +7,8 @@ import { useCustomerManagement } from '@/hooks/matcher/useCustomerManagement';
 import { useFileSelection } from '@/hooks/matcher/useFileSelection';
 import { useProcessExecution } from '@/hooks/matcher/useProcessExecution';
 import { useInvoiceGeneration } from '@/hooks/matcher/useInvoiceGeneration';
-import { useReconciliation } from '@/hooks/matcher/useReconciliation';
 import { useAutoDetection } from '@/hooks/matcher/useAutoDetection';
+import { buildReconciliationResult } from '@/utils/reconciliation-engine';
 
 export function useMatcherController(params: {
     onStepChange: (step: 'configure' | 'upload' | 'done') => void;
@@ -20,13 +20,11 @@ export function useMatcherController(params: {
         setPerFileStats,
         fileGenConfigs,
         setFileGenConfigs,
-        outputFileHeaders,
-        setOutputFileHeaders,
-        outputFileData,
-        setOutputFileData,
         reset,
         noMatchLabel,
         setOutputFilePath,
+        reconciliationResult,
+        setReconciliationResult,
     } = matcherState;
 
     // --- Sub-hooks ---
@@ -49,17 +47,7 @@ export function useMatcherController(params: {
         setTargetConfigs: fileSelection.setTargetConfigs
     });
 
-    const reconciliation = useReconciliation({
-        outputFileHeaders,
-        outputFileData,
-        fileGenConfigs,
-        noMatchLabel,
-        customers: customerMgmt.customers,
-        targetConfigs: fileSelection.targetConfigs,
-        setFileGenConfigs
-    });
-
-    const { reconciliationResult } = reconciliation;
+    // Removed useReconciliation hook - calculations are now done in handleProcess directly
 
     // --- Derived State ---
     const summaryConfig = useMemo(
@@ -88,38 +76,49 @@ export function useMatcherController(params: {
                 setStats(stats);
                 setPerFileStats(perFileStats);
             },
-            onSuccess: () => {
+            onSuccess: (targetMatchMap, masterResultColIndex, customerStats, unmatchedCount) => {
+                const newConfigs = { ...fileGenConfigs };
+
+                // Seed 'output' config with the exact result column written by the backend
+                newConfigs['output'] = {
+                    ...(newConfigs['output'] || { customerId: null }),
+                    ...(masterResultColIndex >= 0 ? { resultColIdx: masterResultColIndex } : {}),
+                };
+
+                // Link each matched customer name to their customer ID
+                Object.entries(targetMatchMap).forEach(([_, matchLabel]) => {
+                    const customer = customerMgmt.customers.find(c => c?.name === matchLabel);
+                    if (customer) {
+                        newConfigs[matchLabel] = { ...(newConfigs[matchLabel] || {}), customerId: customer.id };
+                    }
+                });
+                setFileGenConfigs(newConfigs);
+
+                // Build reconciliation result immediately using backend stats
+                const recResult = buildReconciliationResult({
+                    backendStats: customerStats,
+                    unmatchedCount: unmatchedCount,
+                    fileGenConfigs: newConfigs,
+                    customers: customerMgmt.customers,
+                });
+                setReconciliationResult(recResult);
+
                 onStepChange('done');
             }
         });
-    }, [fileSelection.isReady, fileSelection.masterConfig, fileSelection.targetConfigs, customerMgmt.customers, fileGenConfigs, noMatchLabel, processExec, setStats, setPerFileStats, onStepChange]);
+    }, [fileSelection.isReady, fileSelection.masterConfig, fileSelection.targetConfigs, customerMgmt.customers, fileGenConfigs, noMatchLabel, processExec, setStats, setPerFileStats, onStepChange, setFileGenConfigs]);
 
     const handleGenerateSummary = useCallback(async () => {
         if (!reconciliationResult) return;
         try {
-            await generateExecutiveSummaryExcel(reconciliationResult);
+            await generateExecutiveSummaryExcel(reconciliationResult, 'Executive Summary.xlsx', customerMgmt.customers);
             toast.success('Executive Summary downloaded successfully!');
-        } catch (error) {
+        } catch (error: any) {
             console.error(error);
-            toast.error('Failed to generate summary');
+            toast.error(error?.message || 'Failed to generate summary');
         }
     }, [reconciliationResult]);
 
-    // Update processExec state when files change (if needed) or sync specific effects if any
-    // Note: The original code had side effects for auto-detecting output columns *after* processing.
-    // We should ensure processExec.executeMatching updates matcherState.outputFileHeaders etc.
-    // The hook `useProcessExecution` manages local state for headers/data.
-    // We need to sync that back to `matcherState` or use `matcherState` in `useProcessExecution`.
-    // For now, let's sync manually in an effect or pass setters to `executeMatching`.
-    // I updated `executeMatching` to take setters or we use useEffect.
-    // Actually, `useProcessExecution` has its own state. We should sync it up.
-
-    if (processExec.outputFileHeaders.length > 0 && matcherState.outputFileHeaders.length === 0) {
-        setOutputFileHeaders(processExec.outputFileHeaders);
-    }
-    if (processExec.outputFileData.length > 0 && matcherState.outputFileData.length === 0) {
-        setOutputFileData(processExec.outputFileData);
-    }
     // Sync output file path
     if (processExec.outputFilePath && !matcherState.outputFilePath) {
         setOutputFilePath(processExec.outputFilePath);
@@ -131,25 +130,14 @@ export function useMatcherController(params: {
             toast.error('No matching results available.');
             return;
         }
-        // Ensure customers are loaded
+        // Ensure customers are loaded then generate directly — no dialog
         await customerMgmt.loadCustomers();
-        customerMgmt.setIsCustomerDialogOpen(true);
-    }, [reconciliationResult, customerMgmt]);
-
-    const handleConfirmGeneration = useCallback(async () => {
         await invoiceGen.generateInvoices({
-            outputFileHeaders,
-            outputFileData,
-            fileGenConfigs,
             reconciliationResult,
-            noMatchLabel,
             customers: customerMgmt.customers,
-            onSuccess: () => {
-                customerMgmt.loadCustomers();
-                customerMgmt.setIsCustomerDialogOpen(false);
-            }
+            onSuccess: () => { customerMgmt.loadCustomers(); }
         });
-    }, [invoiceGen, outputFileHeaders, outputFileData, fileGenConfigs, reconciliationResult, noMatchLabel, customerMgmt]);
+    }, [reconciliationResult, customerMgmt, invoiceGen]);
 
     const handleReset = useCallback(() => {
         reset();
@@ -179,7 +167,6 @@ export function useMatcherController(params: {
             setIsCustomerDialogOpen: customerMgmt.setIsCustomerDialogOpen,
             isCreatingCustomer: customerMgmt.isCreatingCustomer,
             setIsCreatingCustomer: customerMgmt.setIsCreatingCustomer,
-            customerProjections: reconciliation.customerProjections,
         },
         customers: customerMgmt.customers,
         summaryConfig,
@@ -198,7 +185,6 @@ export function useMatcherController(params: {
             handleCreateCustomer: (data: CustomerData) => customerMgmt.handleCreateCustomer(data),
             handlePrepareGeneration,
             updateFileConfig: (path: string, updates: Partial<FileGenConfig>) => setFileGenConfigs(prev => ({ ...prev, [path]: { ...prev[path], ...updates } })),
-            handleConfirmGeneration,
             handleOpenUnmatched: processExec.handleOpenUnmatched,
             handleReset,
             handleConfirmMapping: fileSelection.handleConfirmMapping,

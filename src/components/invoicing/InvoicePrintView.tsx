@@ -2,11 +2,15 @@ import { useEffect, useState, useMemo } from 'react';
 import { format } from 'date-fns';
 import headerImg from '@/assets/images/invoice-header.png';
 import footerImg from '@/assets/images/invoice-footer.png';
+import { calculatePricingModifiers } from '@/utils/pricing-utils';
+import type { Customer } from '@/types';
 
 interface InvoiceItem {
+    id?: string;
     description: string;
     quantity: number;
     unitPrice: number;
+    type?: string;
 }
 
 interface InvoiceData {
@@ -23,6 +27,7 @@ interface InvoiceData {
         phone?: string;
         address?: string;
         email?: string;
+        customerId?: string;
     };
     from?: {
         name: string;
@@ -30,11 +35,18 @@ interface InvoiceData {
         phone?: string;
         email?: string;
     };
+    name: string;
+    address?: string;
+    phone?: string;
+    email?: string;
     items: InvoiceItem[];
     total: number;
     currency: string;
     notes?: string;
     paymentTerms?: string;
+    manualSplits?: Record<string, { splitQty: number; splitRate: number; baseRate: number }>;
+    disableExcessPricing?: boolean;
+    excessPenaltyRate?: number;
 }
 
 import type { BankingDetails } from '@/types';
@@ -44,6 +56,7 @@ import type { BankingDetails } from '@/types';
 export function InvoicePrintView() {
     const [data, setData] = useState<InvoiceData | null>(null);
     const [bankingDetails, setBankingDetails] = useState<BankingDetails | null>(null);
+    const [customer, setCustomer] = useState<Customer | null>(null);
 
     useEffect(() => {
         // Fetch Banking Details
@@ -63,10 +76,24 @@ export function InvoicePrintView() {
         const handleData = (_: any, invoice: InvoiceData) => {
             console.log('[PrintView] Received invoice data');
             setData(invoice);
-            setTimeout(() => {
-                console.log('[PrintView] Sending print-ready signal...');
-                window.electron.sendPrintReady();
-            }, 400);
+
+            // Load customer for excess pricing calculation, then signal ready
+            if (invoice.to.customerId && window.electron?.getCustomers) {
+                window.electron.getCustomers().then((result: any) => {
+                    if (result.success && result.customers) {
+                        const cust = result.customers.find((c: Customer) => c.id === invoice.to.customerId);
+                        if (cust) setCustomer(cust);
+                    }
+                    setTimeout(() => { console.log('[PrintView] Sending print-ready signal...'); window.electron.sendPrintReady(); }, 500);
+                }).catch(() => {
+                    setTimeout(() => { window.electron.sendPrintReady(); }, 500);
+                });
+            } else {
+                setTimeout(() => {
+                    console.log('[PrintView] Sending print-ready signal...');
+                    window.electron.sendPrintReady();
+                }, 400);
+            }
         };
 
         if (window.electron && (window.electron as any).onInvoiceData) {
@@ -74,11 +101,49 @@ export function InvoicePrintView() {
         }
     }, []);
 
-    // Don't consolidate items - preserve split pricing with separate rows
+    // Compute display items with splits and excess modifiers (mirrors useInvoiceItems logic)
     const displayItems = useMemo(() => {
         if (!data?.items) return [];
-        return data.items;
-    }, [data?.items]);
+
+        const baseItems = data.items.filter(i =>
+            !i.id?.endsWith('-split-surcharge') && i.id !== 'excess-10mm-surcharge'
+        );
+
+        const pricingCustomer: Customer = customer || {
+            id: data.to.customerId || '', name: data.to.name,
+            address: data.to.address || '', total10mm: 0, total20mm: 0, createdAt: '', updatedAt: ''
+        };
+
+        const dynamicModifiers = calculatePricingModifiers(
+            baseItems as any, pricingCustomer, data.manualSplits,
+            data.disableExcessPricing, data.excessPenaltyRate
+        );
+
+        const wovenItems: InvoiceItem[] = [];
+        baseItems.forEach(item => {
+            const splitMod = dynamicModifiers.find(mod => mod.id === `${item.id}-split-surcharge`);
+
+            // Destructive split: reduce base quantity
+            if (data.manualSplits && item.id && data.manualSplits[item.id]) {
+                const reducedQty = Math.max(0, item.quantity - data.manualSplits[item.id].splitQty);
+                wovenItems.push({ ...item, quantity: reducedQty });
+            } else {
+                wovenItems.push(item);
+            }
+
+            if (splitMod) {
+                wovenItems.push({ ...splitMod, description: item.description });
+            }
+        });
+
+        const excessModifiers = dynamicModifiers.filter(m => !m.id?.endsWith('-split-surcharge'));
+        return [...wovenItems, ...excessModifiers];
+    }, [data?.items, data?.manualSplits, data?.disableExcessPricing, data?.excessPenaltyRate, customer]);
+
+    // Compute actual total from display items (includes modifiers)
+    const computedTotal = useMemo(() => {
+        return Math.round(displayItems.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0) * 100) / 100;
+    }, [displayItems]);
 
     if (!data) {
         return (
@@ -228,7 +293,7 @@ export function InvoicePrintView() {
                             <div style={{ fontSize: '14px', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#86868b', marginBottom: '4px' }}>
                                 Payment Terms
                             </div>
-                            <div style={{ fontSize: '14px', color: '#6e6e73', lineHeight: 1.4 }}>
+                            <div style={{ fontSize: '14px', color: '#6e6e73', lineHeight: 1.4, whiteSpace: 'pre-wrap' }}>
                                 {data.paymentTerms || 'Payment due within 30 days.'}
                             </div>
                         </div>
@@ -243,7 +308,7 @@ export function InvoicePrintView() {
                                     <span style={{ fontWeight: 500, color: '#333' }}>Beneficiary:</span> <span>{bankingDetails.beneficiaryName}</span>
                                     <span style={{ fontWeight: 500, color: '#333' }}>Bank:</span> <span>{bankingDetails.beneficiaryBank}</span>
                                     <span style={{ fontWeight: 500, color: '#333' }}>Branch:</span> <span>{bankingDetails.branch}</span>
-                                    <span style={{ fontWeight: 500, color: '#333' }}>IBAN:</span> <span style={{ fontFamily: 'monospace', fontSize: '14px' }}>{bankingDetails.ibanNo}</span>
+                                    <span style={{ fontWeight: 500, color: '#333' }}>IBAN:</span> <span style={{ fontFamily: 'monospace', fontSize: '14px' }}>{bankingDetails.ibanNo?.replace(/(.{4})/g, '$1 ').trim()}</span>
                                     <span style={{ fontWeight: 500, color: '#333' }}>SWIFT:</span> <span style={{ fontFamily: 'monospace', fontSize: '14px' }}>{bankingDetails.swiftCode}</span>
                                 </div>
                             </div>
@@ -340,8 +405,9 @@ export function InvoicePrintView() {
                         </thead>
                         <tbody>
                             {(() => {
-                                const totalQty = displayItems.reduce((acc, item) => acc + item.quantity, 0);
+                                const totalQty = displayItems.filter(i => i.type !== 'other').reduce((acc, item) => acc + item.quantity, 0);
                                 return displayItems.map((item, i) => {
+                                    const isModifier = item.type === 'other';
                                     return (
                                         <tr key={i}>
                                             <td style={{
@@ -349,7 +415,8 @@ export function InvoicePrintView() {
                                                 color: '#1d1d1f',
                                                 borderBottom: '1px solid #e8e8ed',
                                                 fontWeight: 400,
-                                                fontSize: '14px'
+                                                fontSize: '14px',
+                                                fontStyle: isModifier ? 'italic' : 'normal'
                                             }}>
                                                 {item.description}
                                             </td>
@@ -373,7 +440,7 @@ export function InvoicePrintView() {
                                                 fontSize: '14px',
                                                 fontWeight: 400
                                             }}>
-                                                {totalQty > 0 ? ((item.quantity / totalQty) * 100).toFixed(1) + '%' : '-'}
+                                                {isModifier ? '—' : (totalQty > 0 ? ((item.quantity / totalQty) * 100).toFixed(1) + '%' : '-')}
                                             </td>
                                             <td style={{
                                                 padding: '8px 8px',
@@ -443,7 +510,7 @@ export function InvoicePrintView() {
                                 <span style={{ fontSize: '14px', color: '#86868b', marginRight: '4px' }}>
                                     {data.currency}
                                 </span>
-                                {data.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                {computedTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </span>
                         </div>
                     </div>

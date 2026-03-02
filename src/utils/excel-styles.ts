@@ -2,8 +2,8 @@ import type ExcelJS from 'exceljs';
 
 export const EXCEL_STYLES = {
     HEADER: {
-        font: { bold: true, size: 12, color: { argb: 'FFFFFFFF' } },
-        fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF4F46E5' } }, // Indigo-600
+        font: { bold: true, size: 11, color: { argb: 'FFFFFFFF' } },
+        fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF334155' } }, // Slate-700
         alignment: { horizontal: 'center', vertical: 'middle' },
         border: {
             top: { style: 'thin' },
@@ -24,8 +24,8 @@ export const EXCEL_STYLES = {
     } as Partial<ExcelJS.Style>,
 
     UNMATCHED_HEADER: {
-        font: { bold: true, size: 12, color: { argb: 'FFFFFFFF' } },
-        fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEF4444' } }, // Red
+        font: { bold: true, size: 11, color: { argb: 'FFFFFFFF' } },
+        fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF991B1B' } }, // Red-800
         alignment: { horizontal: 'center', vertical: 'middle' },
         border: {
             top: { style: 'thin' },
@@ -36,8 +36,8 @@ export const EXCEL_STYLES = {
     } as Partial<ExcelJS.Style>,
 
     GRAND_TOTAL: {
-        font: { bold: true, size: 12, color: { argb: 'FFFFFFFF' } },
-        fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF10B981' } }, // Emerald
+        font: { bold: true, size: 11, color: { argb: 'FFFFFFFF' } },
+        fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF475569' } }, // Slate-600
         alignment: { horizontal: 'center', vertical: 'middle' },
         border: {
             top: { style: 'thin' },

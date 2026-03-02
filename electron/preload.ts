@@ -20,6 +20,8 @@ contextBridge.exposeInMainWorld('electron', {
         targetPaths: string[];
         masterColIndices: number[];
         masterResultColIndex: number;
+        masterQuantityColIndex?: number;
+        masterDescriptionColIndex?: number;
         targetMatchColIndices: Record<string, number[]>;
         targetMatchStrings: Record<string, string>;
         matchSentence: string;
@@ -39,7 +41,6 @@ contextBridge.exposeInMainWorld('electron', {
     saveInvoice: (invoice: any) => ipcRenderer.invoke('invoice:save', invoice),
     getInvoices: () => ipcRenderer.invoke('invoice:list'),
     deleteInvoice: (id: string) => ipcRenderer.invoke('invoice:delete', id),
-    generateInvoicePDF: (invoice: any) => ipcRenderer.invoke('invoice:pdf', invoice),
     clearData: () => ipcRenderer.invoke('app:clearData'),
     clearInvoices: () => ipcRenderer.invoke('app:clearInvoices'),
     backupData: () => ipcRenderer.invoke('app:backup'),

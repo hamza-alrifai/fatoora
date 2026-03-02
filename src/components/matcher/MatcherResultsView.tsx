@@ -5,6 +5,7 @@ import { ArrowRight, Check, FileSpreadsheet, Files, Loader2, AlertTriangle, Chec
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import type { ReconciliationResult } from '@/utils/reconciliation-engine';
+import type { Customer } from '@/types';
 import { generateExecutiveSummaryExcel } from '@/utils/executive-summary-generator';
 import { toast } from 'sonner';
 
@@ -25,9 +26,9 @@ interface Stats {
 
 interface MatcherResultsViewProps {
     stats: Stats | null;
-
     perFileStats: FileStats[] | null;
     targetConfigs: any[];
+    customers: Customer[];
     isGeneratingInvoices: boolean;
     handlePrepareGeneration: () => void;
     handleOpenUnmatched: () => void;
@@ -38,6 +39,7 @@ export default function MatcherResultsView({
     stats,
     perFileStats,
     targetConfigs,
+    customers,
     isGeneratingInvoices,
     handlePrepareGeneration,
     handleOpenUnmatched,
@@ -142,11 +144,11 @@ export default function MatcherResultsView({
                             className="w-full text-lg h-12 font-semibold border-indigo-200 text-indigo-700 hover:bg-indigo-100"
                             onClick={async () => {
                                 try {
-                                    await generateExecutiveSummaryExcel(reconciliationResult);
+                                    await generateExecutiveSummaryExcel(reconciliationResult, 'Executive Summary.xlsx', customers);
                                     toast.success("Executive Summary downloaded!");
-                                } catch (e) {
+                                } catch (e: any) {
                                     console.error(e);
-                                    toast.error("Failed to download summary.");
+                                    toast.error(e?.message || "Failed to download summary.");
                                 }
                             }}
                         >
@@ -171,8 +173,8 @@ export default function MatcherResultsView({
                         {perFileStats && perFileStats.length > 0 ? (
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 {perFileStats.map((file, idx) => {
-                                    const config = targetConfigs.find(t => t.filePath === file.filePath);
-                                    const displayName = config?.matchLabel || file.fileName;
+                                    const config = targetConfigs.find(t => t?.filePath === file?.filePath);
+                                    const displayName = config?.matchLabel || file?.fileName;
 
                                     return (
                                         <div key={idx} className="bg-muted/30 border rounded-xl p-4 transition-all hover:bg-muted/50">

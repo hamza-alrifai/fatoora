@@ -214,10 +214,10 @@ export function CustomerWorkspace() {
                                                     </div>
                                                 </TableCell>
                                                 <TableCell className="text-right font-mono">
-                                                    {(cust.total10mm || 0).toLocaleString()}
+                                                    {(cust.total10mm || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                                 </TableCell>
                                                 <TableCell className="text-right font-mono">
-                                                    {(cust.total20mm || 0).toLocaleString()}
+                                                    {(cust.total20mm || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                                 </TableCell>
                                             </TableRow>
                                         ))}

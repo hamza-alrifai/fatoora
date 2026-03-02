@@ -142,7 +142,7 @@ export function ColumnMapper({
                             >
                                 <option value="">Select Customer...</option>
                                 {customers.map(c => (
-                                    <option key={c.id} value={c.name}>{c.name}</option>
+                                    <option key={c.id} value={c.name || ''}>{c.name || 'Unnamed'}</option>
                                 ))}
                                 <option disabled>──────────</option>
                                 <option value="___NEW___">+ Create New Customer</option>

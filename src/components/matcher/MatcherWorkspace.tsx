@@ -9,7 +9,6 @@ import { useMatcherController } from './useMatcherController';
 const MatcherUploadView = lazy(() => import('./MatcherUploadView'));
 const MatcherConfigureView = lazy(() => import('./MatcherConfigureView'));
 const MatcherResultsView = lazy(() => import('./MatcherResultsView'));
-const InvoiceGenerationDialog = lazy(() => import('./InvoiceGenerationDialog'));
 const CustomerCreationDialog = lazy(() => import('@/components/customers/CustomerCreationDialog'));
 
 interface MatcherWorkspaceProps {
@@ -37,8 +36,6 @@ export function MatcherWorkspace({ currentStep, onStepChange }: MatcherWorkspace
         noMatchLabel,
         stats,
         perFileStats,
-        fileGenConfigs,
-        outputFileHeaders,
         isHydrated,
     } = state;
 
@@ -79,25 +76,6 @@ export function MatcherWorkspace({ currentStep, onStepChange }: MatcherWorkspace
                         )
                     }
                 />
-
-                {/* Invoice Generation Configuration Wizard */}
-                {ui.isCustomerDialogOpen && !ui.isCreatingCustomer && (
-                    <Suspense fallback={null}>
-                        <InvoiceGenerationDialog
-                            isOpen={true}
-                            onClose={() => ui.setIsCustomerDialogOpen(false)}
-                            fileGenConfigs={fileGenConfigs}
-                            onUpdateConfig={actions.updateFileConfig}
-                            reconciliationResult={reconciliationResult}
-                            customers={customers}
-                            outputFileHeaders={outputFileHeaders}
-                            customerProjections={ui.customerProjections}
-                            onCreateCustomer={() => ui.setIsCreatingCustomer(true)}
-                            onGenerate={actions.handleConfirmGeneration}
-                            isGenerating={ui.isGeneratingInvoices}
-                        />
-                    </Suspense>
-                )}
 
                 {/* Create Customer Dialog */}
                 {ui.isCreatingCustomer && (
@@ -152,10 +130,11 @@ export function MatcherWorkspace({ currentStep, onStepChange }: MatcherWorkspace
                                     stats={stats}
                                     perFileStats={perFileStats}
                                     targetConfigs={targetConfigs}
+                                    customers={customers}
                                     isGeneratingInvoices={ui.isGeneratingInvoices}
                                     handlePrepareGeneration={actions.handlePrepareGeneration}
                                     handleOpenUnmatched={actions.handleOpenUnmatched}
-                                    reconciliationResult={reconciliationResult}
+                                    reconciliationResult={reconciliationResult!}
                                 />
                             </Suspense>
                         )}

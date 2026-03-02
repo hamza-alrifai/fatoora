@@ -65,21 +65,6 @@ export function findFirstEmptyColumn(data: any[][]): number {
     return maxCols; // Return index after last column (new column)
 }
 
-// Helper: Generate smart match label from filename
-export function generateMatchLabel(filePath: string): string {
-    const filename = path.basename(filePath, path.extname(filePath));
-    // Convert snake_case and kebab-case to spaces
-    let label = filename.replace(/[_-]/g, ' ');
-    // Remove common prefixes/suffixes
-    label = label.replace(/\b(data|file|export|report|sheet)\b/gi, '').trim();
-    // Title case
-    label = label.replace(/\b\w/g, c => c.toUpperCase());
-    // Truncate if too long
-    if (label.length > 25) {
-        label = label.substring(0, 22) + '...';
-    }
-    return label || 'Matched';
-}
 
 // Helper: Normalize value for matching (handles numbers, strings, whitespace)
 export function normalizeValue(val: any): string {
@@ -91,6 +76,34 @@ export function normalizeValue(val: any): string {
     // Convert to lowercase for case-insensitive matching
     return str.toLowerCase();
 }
+
+/**
+ * Highly robust normalizer for matching exact IDs (like QPMC tickets).
+ * Removes all whitespace, invisible unicode characters, hyphens, underscores, and punctuation.
+ * Handles Excel's annoying `.0` trailing injection for pure numeric values.
+ */
+export function normalizeMatchKeyItem(value: any): string {
+    if (value === null || value === undefined || value === '') {
+        return '';
+    }
+
+    // Convert to string and enforce basic trim
+    let str = String(value).trim();
+
+    // If Excel read it as a float (e.g., "12345.0" instead of "12345")
+    if (str.endsWith('.0') && !isNaN(Number(str))) {
+        str = str.substring(0, str.length - 2);
+    }
+
+    // Strip absolutely everything except letters and numbers.
+    // This removes commas, periods, hyphens, spaces, and any invisible unicode data corruption
+    // ensuring a 100% pure alphanumeric comparison.
+    str = str.replace(/[^a-zA-Z0-9]/g, '');
+
+    return str.toLowerCase();
+}
+
+
 
 /**
  * AI-Level Analysis Helpers
@@ -228,27 +241,62 @@ export function findHeaderRow(data: any[][]): number {
     return bestRow;
 }
 
-// Helper: Find footer start row (totals, empty rows at end)
-export function findFooterStartRow(data: any[][]): number {
-    // Look backwards from end for rows with "total", "sum", or mostly empty
-    for (let i = data.length - 1; i >= Math.max(0, data.length - 10); i--) {
-        const row = data[i];
-        if (!row) continue;
+// Helper: Find footer start row by detecting the end of the structural table format
+export function findFooterStartRow(data: any[][], headerRowIndex: number = 0): number {
+    // 1. Establish the "baseline" columns from the first few data rows
+    const dataStart = headerRowIndex + 1;
+    let maxCols = 0;
 
-        // Check for total/sum keywords
-        const rowStr = row.join(' ').toLowerCase();
-        if (rowStr.includes('total') || rowStr.includes('sum') ||
-            rowStr.includes('grand total') || rowStr.includes('subtotal')) {
-            return i;
+    for (let i = dataStart; i < Math.min(dataStart + 10, data.length); i++) {
+        if (!data[i]) continue;
+        const filled = data[i].filter(c => c !== undefined && c !== null && String(c).trim() !== '').length;
+        if (filled > maxCols) maxCols = filled;
+    }
+
+    // Fallback if we couldn't establish a baseline
+    if (maxCols < 2) return data.length;
+
+    // 2. Scan from top-to-bottom looking for a structural break
+    // A break is defined as a row with less than 50% of the baseline columns filled,
+    // OR consecutive empty rows.
+    let emptyStreak = 0;
+
+    for (let i = dataStart; i < data.length; i++) {
+        const row = data[i];
+        const filledCells = row ? row.filter(c => c !== undefined && c !== null && String(c).trim() !== '').length : 0;
+
+        if (filledCells === 0) {
+            emptyStreak++;
+            // If we see 3 empty rows in a row, assume the table ended before them
+            if (emptyStreak >= 3) {
+                return i - 2;
+            }
+            continue;
+        } else {
+            emptyStreak = 0; // Reset streak
         }
 
-        // Check if row is mostly empty (>80% empty cells)
-        const emptyCount = row.filter(c => !c || c === '').length;
-        if (row.length > 0 && emptyCount / row.length > 0.8) {
-            // This is an empty row, keep looking
-            continue;
+        // If a row has significantly fewer columns (e.g., just a "Total: 500" cell at the end)
+        // We consider it a footer if it's less than half the expected columns AND we are past the first few rows
+        if (i > dataStart + 5 && filledCells <= Math.max(2, Math.floor(maxCols * 0.4))) {
+            const firstCellText = row.find(c => c !== undefined && c !== null && String(c).trim() !== '');
+            const textLower = String(firstCellText || '').toLowerCase();
+
+            // If the structural break also contains footer keywords, we are definitely at the footer
+            if (textLower.includes('total') || textLower.includes('sum') || textLower.includes('subtotal')) {
+                return i;
+            }
         }
     }
 
-    return data.length; // No footer found, use end of data
+    // 3. Fallback: Strip trailing empty rows from the bottom
+    for (let i = data.length - 1; i > dataStart; i--) {
+        const row = data[i];
+        const filledCells = row ? row.filter(c => c !== undefined && c !== null && String(c).trim() !== '').length : 0;
+        if (filledCells > 1) {
+            return i + 1;
+        }
+    }
+
+    return data.length;
 }

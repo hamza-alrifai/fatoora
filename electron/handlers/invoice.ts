@@ -2,7 +2,7 @@ import { ipcMain, BrowserWindow } from 'electron';
 import crypto from 'crypto';
 import { getDB } from '../db';
 import { getTodayString, extractDateString, isInvoiceOverdue } from '../utils/invoice-utils';
-import { generateInvoicePDF, generateSecureInvoicePDF } from '../services/pdf-service';
+import { generateSecureInvoicePDF } from '../services/pdf-service';
 import path from 'path';
 
 export function registerInvoiceHandlers(mainWindowGetter: () => BrowserWindow | null) {
@@ -112,10 +112,6 @@ export function registerInvoiceHandlers(mainWindowGetter: () => BrowserWindow | 
         }
     });
 
-    // Generate PDF
-    ipcMain.handle('invoice:pdf', async (_, invoice: any) => {
-        return await generateInvoicePDF(invoice);
-    });
 
     // Secure PDF Generation (HTML-to-PDF + Encryption)
     ipcMain.handle('invoice:generate-secure', async (_, invoice: any, appUrl?: string) => {

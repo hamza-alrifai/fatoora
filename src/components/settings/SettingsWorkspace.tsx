@@ -178,10 +178,10 @@ export function SettingsWorkspace() {
                                 <div className="grid gap-2">
                                     <label className="text-sm font-semibold">IBAN Number</label>
                                     <Input
-                                        value={bankingDetails.ibanNo}
-                                        onChange={(e) => handleChange('ibanNo', e.target.value)}
+                                        value={bankingDetails.ibanNo?.replace(/(.{4})/g, '$1 ').trim() || ''}
+                                        onChange={(e) => handleChange('ibanNo', e.target.value.replace(/\s/g, '').toUpperCase())}
                                         placeholder="QA00 0000 0000 0000 0000 0000 000"
-                                        className="font-mono"
+                                        className="font-mono tracking-wider"
                                     />
                                 </div>
                                 <div className="grid gap-2">

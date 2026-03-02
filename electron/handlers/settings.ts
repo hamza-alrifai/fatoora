@@ -138,6 +138,14 @@ export function registerSettingsHandlers() {
         return result;
     });
 
+    // Open Directory Dialog
+    ipcMain.handle('dialog:openDirectory', async () => {
+        const result = await dialog.showOpenDialog({
+            properties: ['openDirectory'],
+        });
+        return result;
+    });
+
     // Save File Dialog
     ipcMain.handle('dialog:saveFile', async (_, defaultPath) => {
         const result = await dialog.showSaveDialog({

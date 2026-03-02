@@ -5,6 +5,7 @@
 
 import { useState, useEffect } from 'react';
 import type { FileAnalysis } from "../types";
+import type { ReconciliationResult } from '@/utils/reconciliation-engine';
 
 
 interface FileConfig extends FileAnalysis {
@@ -39,9 +40,7 @@ interface MatcherState {
         percentage: number;
     }> | null;
     fileGenConfigs: Record<string, FileGenConfig>;
-    outputFileHeaders: { name: string; index: number }[];
-    outputFileData: any[][];
-
+    reconciliationResult: ReconciliationResult | null;
 }
 
 const STORAGE_KEY = 'fatoora_matcher_state';
@@ -54,8 +53,7 @@ export function useMatcherState(onStepChange: (step: 'upload' | 'configure' | 'd
     const [stats, setStats] = useState<MatcherState['stats']>(null);
     const [perFileStats, setPerFileStats] = useState<MatcherState['perFileStats']>(null);
     const [fileGenConfigs, setFileGenConfigs] = useState<Record<string, FileGenConfig>>({});
-    const [outputFileHeaders, setOutputFileHeaders] = useState<{ name: string; index: number }[]>([]);
-    const [outputFileData, setOutputFileData] = useState<any[][]>([]);
+    const [reconciliationResult, setReconciliationResult] = useState<ReconciliationResult | null>(null);
 
     const [isHydrated, setIsHydrated] = useState(false);
 
@@ -73,9 +71,7 @@ export function useMatcherState(onStepChange: (step: 'upload' | 'configure' | 'd
                 if (data.stats) setStats(data.stats);
                 if (data.perFileStats) setPerFileStats(data.perFileStats);
                 if (data.fileGenConfigs) setFileGenConfigs(data.fileGenConfigs);
-                if (data.outputFileHeaders) setOutputFileHeaders(data.outputFileHeaders);
-                if (data.outputFileData) setOutputFileData(data.outputFileData);
-
+                if (data.reconciliationResult) setReconciliationResult(data.reconciliationResult);
 
                 if (data.stats && data.stats.totalMasterRows > 0) {
                     onStepChange('done');
@@ -95,8 +91,6 @@ export function useMatcherState(onStepChange: (step: 'upload' | 'configure' | 'd
         if (!isHydrated) return;
 
         try {
-            const safeOutputData = (outputFileData && outputFileData.length > 5000) ? [] : outputFileData;
-
             const stateToSave: Partial<MatcherState> = {
                 masterConfig,
                 targetConfigs,
@@ -105,9 +99,7 @@ export function useMatcherState(onStepChange: (step: 'upload' | 'configure' | 'd
                 stats,
                 perFileStats,
                 fileGenConfigs,
-                outputFileHeaders,
-                outputFileData: safeOutputData,
-
+                reconciliationResult
             };
             localStorage.setItem(STORAGE_KEY, JSON.stringify(stateToSave));
         } catch (e) {
@@ -122,9 +114,7 @@ export function useMatcherState(onStepChange: (step: 'upload' | 'configure' | 'd
         stats,
         perFileStats,
         fileGenConfigs,
-        outputFileHeaders,
-        outputFileData,
-
+        reconciliationResult,
     ]);
 
     const reset = () => {
@@ -135,8 +125,7 @@ export function useMatcherState(onStepChange: (step: 'upload' | 'configure' | 'd
         setStats(null);
         setPerFileStats(null);
         setOutputFilePath(null);
-        setOutputFileHeaders([]);
-        setOutputFileData([]);
+        setReconciliationResult(null);
         setFileGenConfigs({});
 
     };
@@ -156,10 +145,8 @@ export function useMatcherState(onStepChange: (step: 'upload' | 'configure' | 'd
         setPerFileStats,
         fileGenConfigs,
         setFileGenConfigs,
-        outputFileHeaders,
-        setOutputFileHeaders,
-        outputFileData,
-        setOutputFileData,
+        reconciliationResult,
+        setReconciliationResult,
 
         isHydrated,
         reset,

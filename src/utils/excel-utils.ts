@@ -28,6 +28,33 @@ export function normalizeValue(value: any): string {
 }
 
 /**
+ * Highly robust normalizer for matching exact IDs (like QPMC tickets).
+ * Removes all whitespace, invisible unicode characters, trailing `.0`,
+ * and formatting commas to ensure 100% accurate string matching.
+ */
+export function normalizeMatchKeyItem(value: any): string {
+    if (value === null || value === undefined) {
+        return '';
+    }
+    let str = String(value);
+
+    // Remove formatting commas if it looks like a number
+    if (/^[0-9,]+(\.0)?$/.test(str)) {
+        str = str.replace(/,/g, '');
+    }
+
+    // Remove trailing .0 from Excel number-to-string anomalies
+    if (str.endsWith('.0')) {
+        str = str.substring(0, str.length - 2);
+    }
+
+    // Remove all whitespace and invisible unicode characters
+    str = str.replace(/[\s\u200B-\u200D\uFEFF]/g, '');
+
+    return str.toLowerCase();
+}
+
+/**
  * Check if a value looks like a valid ID (ticket number, reference, etc.)
  * @param value - Raw cell value
  * @returns True if it looks like an ID
